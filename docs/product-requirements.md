@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.2.0
+**Document Version:** 1.3.0
 
 **Status:** Draft
 
@@ -491,6 +491,126 @@ Athena shall maintain a history of imported files and processing results.
 Athena may provide categorization suggestions, summaries, and anomaly detection while preserving deterministic financial records.
 
 AI-generated recommendations shall always require user review before modifying financial data.
+
+---
+
+# Non-Functional Requirements
+
+This section defines the quality attributes that Athena must satisfy. Non-functional requirements establish expectations for performance, security, reliability, maintainability, scalability, usability, and data integrity.
+
+Like functional requirements, each non-functional requirement is assigned a unique identifier for traceability.
+
+---
+
+## Security
+
+### NFR-001 — Confidentiality
+
+Athena shall protect sensitive financial data using industry-standard security controls.
+
+### NFR-002 — Least Privilege
+
+Athena shall enforce least-privilege access across all application components.
+
+### NFR-003 — Secure Authentication
+
+Authentication mechanisms shall follow modern security best practices and support multi-factor authentication.
+
+### NFR-004 — Encryption
+
+Sensitive data shall be encrypted in transit. Sensitive secrets shall never be stored in source control.
+
+---
+
+## Reliability
+
+### NFR-005 — Data Integrity
+
+Financial calculations shall be deterministic, reproducible, and auditable.
+
+### NFR-006 — Error Handling
+
+Failures shall return meaningful error messages without exposing sensitive implementation details.
+
+### NFR-007 — Recovery
+
+The system shall support restoration from verified backups.
+
+---
+
+## Performance
+
+### NFR-008 — Dashboard Performance
+
+The dashboard should load within two seconds under normal operating conditions.
+
+### NFR-009 — Import Performance
+
+Athena should import and process standard monthly financial statements within thirty seconds.
+
+---
+
+## Maintainability
+
+### NFR-010 — Documentation
+
+Major architectural decisions, security decisions, and implementation details shall be documented.
+
+### NFR-011 — Code Quality
+
+The project shall follow documented coding standards and maintain a modular architecture.
+
+### NFR-012 — Testability
+
+Business logic shall be designed for automated unit and integration testing.
+
+---
+
+## Scalability
+
+### NFR-013 — Growth
+
+Athena shall support future expansion without requiring significant architectural redesign.
+
+### NFR-014 — Extensibility
+
+Core modules shall remain loosely coupled to encourage future feature development.
+
+---
+
+## Usability
+
+### NFR-015 — Accessibility
+
+The user interface should follow modern accessibility best practices where practical.
+
+### NFR-016 — Responsive Design
+
+Athena shall provide a usable experience across desktop, tablet, and mobile devices.
+
+---
+
+## Data Ownership
+
+### NFR-017 — Exportability
+
+Users shall be able to export their financial records using documented formats.
+
+### NFR-018 — Transparency
+
+Automated decisions shall remain explainable and traceable.
+
+---
+
+## Engineering Practices
+
+### NFR-019 — Version Control
+
+All source code and documentation changes shall be tracked using Git.
+
+### NFR-020 — Continuous Improvement
+
+Architecture, documentation, and testing shall evolve alongside implementation throughout the project lifecycle.
   
 ## Revision History
 
@@ -499,3 +619,4 @@ AI-generated recommendations shall always require user review before modifying f
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Created initial Product Requirements Document. |
 | 1.1.0 | 2026-07-26 | Caitlin Gillum | Added Goals and Non-Goals sections. |
 | 1.2.0 | 2026-07-26 | Caitlin Gillum | Added Functional Requirements section with traceable requirement identifiers. |
+| 1.3.0 | 2026-07-26 | Caitlin Gillum | Added Non-Functional Requirements section defining quality attributes, performance expectations, security principles, and engineering standards. |
