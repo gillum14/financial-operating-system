@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.1.0
+**Document Version:** 1.2.0
 
 **Status:** Draft
 
@@ -317,6 +317,180 @@ Athena is not intended to eliminate all user review.
 Ambiguous transactions, malformed files, unusual merchant descriptions, and conflicting financial records must be surfaced for confirmation rather than guessed.
 
 Financial correctness takes priority over automation speed.
+
+---
+
+# Functional Requirements
+
+This section defines the core capabilities Athena must provide. Functional requirements describe **what the system shall do**, independent of implementation details.
+
+Each requirement is assigned a unique identifier to improve traceability across architecture, implementation, testing, and future enhancements.
+
+---
+
+## Transaction Management
+
+### FR-001 — Transaction Import
+
+Athena shall support importing financial transaction data from user-provided CSV files.
+
+### FR-002 — Transaction Validation
+
+Athena shall validate imported files before processing and reject malformed or unsupported input.
+
+### FR-003 — Transaction Normalization
+
+Athena shall normalize imported transaction data into a consistent internal format regardless of source institution.
+
+### FR-004 — Duplicate Detection
+
+Athena shall identify duplicate transactions before import and prevent duplicate records from being created.
+
+### FR-005 — Internal Transfer Detection
+
+Athena shall identify transfers between user-owned accounts and exclude them from spending calculations.
+
+### FR-006 — Transaction Editing
+
+Athena shall allow authorized users to edit transaction metadata without modifying the original imported record.
+
+---
+
+## Categorization
+
+### FR-007 — Merchant Recognition
+
+Athena shall identify known merchants using a configurable Merchant Dictionary.
+
+### FR-008 — Rule-Based Categorization
+
+Athena shall apply deterministic categorization rules before requesting user input.
+
+### FR-009 — Manual Review Queue
+
+Athena shall create a review queue for transactions that cannot be categorized with confidence.
+
+### FR-010 — Category Management
+
+Athena shall support user-defined categories and subcategories.
+
+---
+
+## Budgeting
+
+### FR-011 — Budget Creation
+
+Athena shall allow users to create monthly zero-based budgets.
+
+### FR-012 — Budget Tracking
+
+Athena shall compare actual spending against budgeted amounts.
+
+### FR-013 — Budget Rollovers
+
+Athena shall support recurring savings goals and sinking funds.
+
+---
+
+## Financial Reporting
+
+### FR-014 — Dashboard
+
+Athena shall provide an executive dashboard summarizing financial health.
+
+### FR-015 — Spending Reports
+
+Athena shall generate reports grouped by category, merchant, and time period.
+
+### FR-016 — Income Reports
+
+Athena shall summarize income by source and reporting period.
+
+### FR-017 — Cash Flow Reports
+
+Athena shall calculate monthly cash flow.
+
+---
+
+## Debt Management
+
+### FR-018 — Debt Tracking
+
+Athena shall store and monitor liabilities.
+
+### FR-019 — Debt Payoff Analysis
+
+Athena shall calculate debt payoff progress and estimated completion dates.
+
+---
+
+## Net Worth
+
+### FR-020 — Asset Tracking
+
+Athena shall maintain asset balances.
+
+### FR-021 — Liability Tracking
+
+Athena shall maintain liability balances.
+
+### FR-022 — Net Worth Calculation
+
+Athena shall calculate historical and current net worth.
+
+---
+
+## Goals
+
+### FR-023 — Financial Goals
+
+Athena shall allow users to define financial goals.
+
+### FR-024 — Goal Progress
+
+Athena shall track progress toward each financial goal.
+
+---
+
+## Security
+
+### FR-025 — Authentication
+
+Athena shall require authenticated access before financial data is accessible.
+
+### FR-026 — Authorization
+
+Athena shall enforce authorization controls that prevent unauthorized access to financial records.
+
+### FR-027 — Audit Logging
+
+Athena shall maintain an audit trail for significant user actions.
+
+---
+
+## Data Management
+
+### FR-028 — Data Export
+
+Athena shall allow users to export their financial data.
+
+### FR-029 — Backup Support
+
+Athena shall support recovery through database backups.
+
+### FR-030 — Import History
+
+Athena shall maintain a history of imported files and processing results.
+
+---
+
+## Artificial Intelligence
+
+### FR-031 — AI Assistance
+
+Athena may provide categorization suggestions, summaries, and anomaly detection while preserving deterministic financial records.
+
+AI-generated recommendations shall always require user review before modifying financial data.
   
 ## Revision History
 
@@ -324,3 +498,4 @@ Financial correctness takes priority over automation speed.
 |----------|------------|-----------------|--------------------------------------------------------------|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Created initial Product Requirements Document. |
 | 1.1.0 | 2026-07-26 | Caitlin Gillum | Added Goals and Non-Goals sections. |
+| 1.2.0 | 2026-07-26 | Caitlin Gillum | Added Functional Requirements section with traceable requirement identifiers. |
