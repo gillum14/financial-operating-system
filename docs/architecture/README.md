@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -95,7 +95,7 @@ Architecture should remain understandable by engineers who were not involved in 
 |----------|---------|
 | System Architecture | High-level overview of Athena and its major components |
 | Application Architecture | Internal application structure and logical layers |
-| Frontend Architecture | User interface organization and client responsibilities |
+| Frontend Architecture | User interface organization, modular dashboard architecture, client responsibilities, and presentation patterns |
 | Backend Architecture | APIs, services, business logic, and processing |
 | Database Architecture | Relational data model and persistence strategy |
 | Deployment Architecture | Hosting, infrastructure, environments, and CI/CD |
@@ -134,3 +134,4 @@ Implementation details belong in source code.
 | Version | Date | Author | Summary |
 |----------|------------|-----------------|------------------------------------------------|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Created architecture documentation framework. |
+| 1.1.0 | 2026-07-26 | Caitlin Gillum | Updated the Frontend Architecture description to reflect the modular dashboard architecture and presentation model. |

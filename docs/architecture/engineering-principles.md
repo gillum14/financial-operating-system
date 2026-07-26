@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -359,6 +359,24 @@ Athena shall not automate a process merely because automation is technically pos
 
 ---
 
+## User Adaptability
+
+Athena shall provide intelligent defaults while allowing users to adapt the platform to their individual workflows.
+
+Customization should enhance presentation, organization, and workflow without compromising:
+
+- Financial correctness
+- Security
+- Authorization
+- Data integrity
+- Auditability
+
+Whenever practical, the platform should adapt to the user rather than requiring the user to adapt to the platform.
+
+Customization shall modify presentation and workflow, not authoritative financial records.
+
+---
+
 ## Build for the Next Engineer
 
 Code and documentation shall be written so that an engineer unfamiliar with the original implementation can understand, test, maintain, and extend the system.
@@ -444,3 +462,4 @@ Convenience alone is not sufficient justification for an exception.
 | Version | Date | Author | Summary |
 |----------|------------|-----------------|------------------------------------------------|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Established the engineering principles governing Athena's architecture, implementation, security, testing, automation, and maintenance. |
+| 1.1.0 | 2026-07-26 | Caitlin Gillum | Added the User Adaptability engineering principle to support future user-configurable workflows while preserving financial correctness and security. |

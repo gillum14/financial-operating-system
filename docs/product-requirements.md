@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.3.0
+**Document Version:** 1.4.0
 
 **Status:** Draft
 
@@ -494,6 +494,24 @@ AI-generated recommendations shall always require user review before modifying f
 
 ---
 
+### FR-032 — Modular Dashboard Customization
+
+The system should support a modular dashboard that allows users to customize how financial information is presented without modifying authoritative financial records.
+
+Future dashboard customization may include:
+
+- Showing or hiding widgets
+- Reordering widgets
+- Resizing widgets
+- Saving multiple dashboard layouts
+- Dashboard-specific filters
+- Device-specific layouts
+- Restoring the default dashboard layout
+
+Dashboard customization shall affect presentation only and shall never modify financial calculations or authoritative financial records.
+
+---
+
 # Non-Functional Requirements
 
 This section defines the quality attributes that Athena must satisfy. Non-functional requirements establish expectations for performance, security, reliability, maintainability, scalability, usability, and data integrity.
@@ -620,3 +638,4 @@ Architecture, documentation, and testing shall evolve alongside implementation t
 | 1.1.0 | 2026-07-26 | Caitlin Gillum | Added Goals and Non-Goals sections. |
 | 1.2.0 | 2026-07-26 | Caitlin Gillum | Added Functional Requirements section with traceable requirement identifiers. |
 | 1.3.0 | 2026-07-26 | Caitlin Gillum | Added Non-Functional Requirements section defining quality attributes, performance expectations, security principles, and engineering standards. |
+| 1.4.0 | 2026-07-26 | Caitlin Gillum | Added FR-032 to define modular dashboard customization and future user-configurable dashboard capabilities. |
