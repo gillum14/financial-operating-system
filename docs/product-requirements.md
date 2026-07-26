@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -82,9 +82,245 @@ Financial Operating System addresses these limitations by combining structured f
 Users retain ownership of their financial data while benefiting from automated transaction processing, comprehensive reporting, long-term maintainability, and transparent financial calculations.
 
 ---
+
+---
+
+# Goals
+
+The primary goal of Athena is to provide a secure, accurate, and extensible platform for managing personal financial data and making informed financial decisions.
+
+## Product Goals
+
+### Centralize Financial Data
+
+Athena will provide a single source of truth for financial records, including:
+
+- Income
+- Expenses
+- Transfers
+- Recurring bills
+- Budgets
+- Debts
+- Assets
+- Liabilities
+- Net worth
+- Financial goals
+- Legal expenses
+- Medical expenses
+- Child support obligations and payments
+
+### Automate Transaction Processing
+
+Athena will reduce manual financial administration by supporting:
+
+- CSV transaction imports
+- Transaction normalization
+- Duplicate detection
+- Internal transfer detection
+- Merchant recognition
+- Deterministic categorization rules
+- Exception-based review workflows
+- Import history and audit records
+
+### Support Zero-Based Budgeting
+
+Athena will support an every-dollar-has-a-job budgeting model in which:
+
+- Budget allocations are based on guaranteed income.
+- Expected but unreliable income is tracked separately.
+- Monthly spending targets are assigned by category.
+- Sinking funds can accumulate across budget periods.
+- Extraordinary expenses remain distinguishable from ordinary living costs.
+- Budget performance can be reviewed by month and category.
+
+### Provide Financial Visibility
+
+Athena will provide clear visual and analytical reporting for:
+
+- Spending by category
+- Monthly cash flow
+- Income sources
+- Debt payoff progress
+- Net worth trends
+- Budget performance
+- Legal costs
+- Medical costs
+- Child-related expenses
+- Career-development investments
+- Financial goal progress
+
+### Support Debt Management
+
+Athena will allow users to:
+
+- Record debts and balances
+- Track interest rates and minimum payments
+- Record debt payments
+- Compare payoff strategies
+- Monitor payoff progress
+- Estimate projected payoff dates
+
+### Track Net Worth
+
+Athena will calculate and visualize net worth using:
+
+- Asset balances
+- Liability balances
+- Historical snapshots
+- Monthly changes
+- Supporting account records
+
+### Protect Sensitive Financial Data
+
+Athena will implement security and privacy controls appropriate for highly sensitive financial information, including:
+
+- Secure authentication
+- Strong authorization
+- Least-privilege access
+- Row-level data isolation
+- Input validation
+- Secure secrets management
+- Audit logging
+- Protected file storage
+- Secure deployment practices
+- Data export and deletion controls
+
+### Preserve User Ownership
+
+Athena will ensure that users retain control of their data by supporting:
+
+- Exportable financial records
+- Open and documented data formats
+- Clear data-retention behavior
+- User-directed deletion
+- Minimal vendor lock-in where practical
+
+### Demonstrate Production-Quality Engineering
+
+Athena will be developed using professional engineering practices, including:
+
+- Version control
+- Feature branches
+- Pull requests
+- Code review
+- Architecture documentation
+- Architecture Decision Records
+- Threat modeling
+- Automated testing
+- Continuous integration
+- Security scanning
+- Dependency management
+- Release documentation
+- Maintainable code organization
+
+---
+
+# Non-Goals
+
+The following capabilities are intentionally excluded from the initial version of Athena.
+
+Defining these non-goals protects the project from uncontrolled scope expansion and ensures that Version 1 remains achievable, testable, and maintainable.
+
+## Direct Bank Connectivity
+
+Version 1 will not connect directly to financial institutions through Plaid, Open Banking, screen scraping, or similar services.
+
+CSV import will be the initial transaction-ingestion method.
+
+Direct bank synchronization may be evaluated in a future version after the core data model, security architecture, and reconciliation workflows are stable.
+
+## Automated Financial Advice
+
+Athena will not act as a licensed financial advisor, tax professional, attorney, or investment advisor.
+
+The platform may provide calculations, summaries, projections, and organizational tools, but it will not provide professional financial, legal, tax, or investment advice.
+
+## Autonomous AI Decision-Making
+
+Artificial intelligence will not:
+
+- Silently categorize ambiguous transactions
+- Modify financial records without user confirmation
+- Make debt or investment decisions
+- Override deterministic accounting rules
+- Serve as the source of truth for financial calculations
+
+AI may assist with suggestions, summaries, anomaly detection, or explanations, but all material financial decisions must remain reviewable and traceable.
+
+## Investment Trading
+
+Version 1 will not support:
+
+- Securities trading
+- Cryptocurrency trading
+- Automated portfolio rebalancing
+- Brokerage account execution
+- Investment-order placement
+
+Investment balances may be tracked as assets in future releases.
+
+## Tax Filing
+
+Athena will not prepare or electronically file tax returns.
+
+The platform may organize transactions, generate summaries, and export categorized financial data for review by a qualified tax professional.
+
+## Bill Payment Execution
+
+Version 1 will not initiate payments to creditors, utilities, service providers, or other third parties.
+
+Athena may track bills, due dates, balances, and payment status without directly transferring funds.
+
+## Multi-Currency Accounting
+
+Version 1 will use U.S. dollars as its supported operating currency.
+
+Foreign-currency accounts, exchange-rate calculations, and multi-currency reporting are outside the initial scope.
+
+## Multi-User Household Collaboration
+
+Version 1 will support a single authenticated account owner.
+
+Shared household accounts, delegated permissions, joint-user workflows, and role-based collaboration may be considered later.
+
+## Commercial SaaS Operations
+
+Version 1 is not intended to operate as a public commercial financial platform.
+
+The initial system will be designed for private personal use while maintaining architecture that could support future expansion.
+
+The project will not initially include:
+
+- Customer billing
+- Subscription plans
+- Public onboarding
+- Customer-support tooling
+- Enterprise administration
+- Regulatory compliance programs required for a commercial financial service
+
+## Native Mobile Applications
+
+Version 1 will not include separately developed iOS or Android applications.
+
+Athena will initially be delivered as a responsive web application and may later support Progressive Web App capabilities.
+
+## Receipt Optical Character Recognition
+
+Automated receipt scanning and optical character recognition are outside the initial scope.
+
+Receipts may be stored and manually associated with transactions in a future version.
+
+## Perfect Automation
+
+Athena is not intended to eliminate all user review.
+
+Ambiguous transactions, malformed files, unusual merchant descriptions, and conflicting financial records must be surfaced for confirmation rather than guessed.
+
+Financial correctness takes priority over automation speed.
   
 ## Revision History
 
 | Version | Date | Author | Summary |
-|----------|------------|--------|---------|
-| 1.0.0 | 2026-07-26 | Caitlin Gillum | Initial draft created. |
+|----------|------------|-----------------|--------------------------------------------------------------|
+| 1.0.0 | 2026-07-26 | Caitlin Gillum | Created initial Product Requirements Document. |
+| 1.1.0 | 2026-07-26 | Caitlin Gillum | Added Goals and Non-Goals sections. |
