@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Accepted
 
@@ -547,6 +547,7 @@ Google Sheets remains an approved prototype, migration source, and optional expo
 - Provides strong portfolio value across software, cloud, database, and security engineering.
 - Preserves the ability to export PostgreSQL data.
 - Supports future migration away from individual managed providers if necessary.
+- Supports a modular, server-first dashboard architecture that can evolve from a curated default layout to user-configurable widget-based dashboards without significant architectural redesign.
 
 ### Negative Consequences
 
@@ -639,3 +640,4 @@ These decisions shall be documented separately when they become necessary.
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Selected Next.js, TypeScript, PostgreSQL, Supabase, Vercel, GitHub, and GitHub Actions as Athena's initial technology stack. |
+| 1.1.0 | 2026-07-26 | Caitlin Gillum | Expanded the rationale for the selected technology stack to document support for Athena's modular dashboard architecture. |
