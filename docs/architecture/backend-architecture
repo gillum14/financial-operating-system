@@ -1,0 +1,1306 @@
+# Backend Architecture
+
+**Project:** Financial Operating System
+
+**Internal Codename:** Athena
+
+**Document Version:** 1.0.0
+
+**Status:** Draft
+
+**Owner:** Caitlin Gillum
+
+**Primary Architect:** Caitlin Gillum
+
+**Technical Advisor:** OpenAI ChatGPT
+
+**Last Updated:** July 28, 2026
+
+---
+
+## Table of Contents
+
+- [Purpose](#purpose)
+- [Scope](#scope)
+- [Backend Architecture Overview](#backend-architecture-overview)
+- [Architectural Style](#architectural-style)
+- [Backend Responsibilities](#backend-responsibilities)
+- [Trusted Execution Boundary](#trusted-execution-boundary)
+- [Request Processing Pipeline](#request-processing-pipeline)
+- [Backend Layers](#backend-layers)
+  - [Transport Layer](#transport-layer)
+  - [Application Service Layer](#application-service-layer)
+  - [Domain Service Layer](#domain-service-layer)
+  - [Repository Layer](#repository-layer)
+  - [Infrastructure Layer](#infrastructure-layer)
+- [Command and Query Separation](#command-and-query-separation)
+- [Authentication](#authentication)
+- [Authorization](#authorization)
+- [Validation](#validation)
+- [Financial Transactions and Atomicity](#financial-transactions-and-atomicity)
+- [Domain Services](#domain-services)
+- [Import Processing](#import-processing)
+- [Classification and Review](#classification-and-review)
+- [Reporting and Dashboard Queries](#reporting-and-dashboard-queries)
+- [Audit Logging](#audit-logging)
+- [Background Processing](#background-processing)
+- [File Processing](#file-processing)
+- [Error Model](#error-model)
+- [Idempotency](#idempotency)
+- [Concurrency Control](#concurrency-control)
+- [Caching](#caching)
+- [Rate Limiting](#rate-limiting)
+- [Observability](#observability)
+- [Configuration and Secrets](#configuration-and-secrets)
+- [API and Server Interface Strategy](#api-and-server-interface-strategy)
+- [Provisional Folder Structure](#provisional-folder-structure)
+- [Dependency Rules](#dependency-rules)
+- [Testing Strategy](#testing-strategy)
+- [Security Considerations](#security-considerations)
+- [Performance Considerations](#performance-considerations)
+- [Requirement Traceability](#requirement-traceability)
+- [Deferred Decisions](#deferred-decisions)
+- [Related Documents](#related-documents)
+- [Revision History](#revision-history)
+
+---
+
+## Purpose
+
+This document defines the backend architecture for Project Athena.
+
+It describes how trusted server-side application logic shall process authenticated requests, enforce authorization, validate input, execute financial business rules, coordinate persistence, create audit records, process imported files, generate reports, and manage background work.
+
+The backend must preserve financial correctness, security, explainability, and auditability while remaining modular and maintainable.
+
+---
+
+## Scope
+
+This document covers:
+
+- Trusted server-side execution
+- Request processing
+- Application services
+- Domain services
+- Repository responsibilities
+- Infrastructure adapters
+- Authentication
+- Authorization
+- Validation
+- Database transactions
+- Import processing
+- Classification
+- Reporting
+- Audit logging
+- Background work
+- File processing
+- Errors
+- Idempotency
+- Concurrency
+- Caching
+- Rate limiting
+- Observability
+- Secrets
+- Testing
+- Security boundaries
+
+This document does not define:
+
+- Physical database tables
+- Final API endpoint names
+- Final library selections
+- Final queue provider
+- Final monitoring provider
+- Final ORM or query builder
+- Detailed Row Level Security policies
+- Final deployment configuration
+- Final frontend implementation
+
+Those decisions will be documented separately.
+
+---
+
+## Backend Architecture Overview
+
+Athena shall use a trusted server-side backend within the Next.js application boundary.
+
+The backend shall coordinate all financially significant operations.
+
+```mermaid
+flowchart TB
+    Client[Authenticated Client]
+
+    subgraph Backend["Trusted Backend Boundary"]
+        Transport[Transport Layer]
+        Application[Application Services]
+        Domain[Domain Services]
+        Repository[Repository Layer]
+        Infrastructure[Infrastructure Adapters]
+        Audit[Audit Service]
+        Jobs[Background Jobs]
+    end
+
+    subgraph Data["Protected Data Boundary"]
+        Database[(PostgreSQL)]
+        Storage[(Private Object Storage)]
+    end
+
+    subgraph Identity["Identity Boundary"]
+        Auth[Authentication Service]
+    end
+
+    Client --> Transport
+    Transport --> Auth
+    Transport --> Application
+    Application --> Domain
+    Application --> Repository
+    Application --> Audit
+    Application --> Jobs
+    Domain --> Repository
+    Repository --> Database
+    Infrastructure --> Storage
+    Jobs --> Application
+```
+
+The backend shall serve as the primary trust boundary between user-controlled input and authoritative financial records.
+
+---
+
+## Architectural Style
+
+Athena's backend shall use:
+
+- A modular monolith
+- Layered responsibilities
+- Domain-oriented organization
+- Explicit command and query workflows
+- Server-controlled authorization
+- Deterministic financial logic
+- Narrow persistence interfaces
+- Auditable mutations
+- Transactional database operations
+- Replaceable infrastructure adapters
+
+Athena shall not begin as a microservices system.
+
+Independent services may be introduced later only when a documented operational or architectural requirement justifies the additional complexity.
+
+---
+
+## Backend Responsibilities
+
+The backend is responsible for:
+
+- Verifying authenticated identity
+- Enforcing authorization
+- Validating untrusted input
+- Coordinating domain logic
+- Persisting authoritative records
+- Preserving import lineage
+- Enforcing financial invariants
+- Creating audit records
+- Managing review workflows
+- Generating trusted reports
+- Supporting dashboard widgets
+- Processing files
+- Managing long-running work
+- Returning safe responses
+- Protecting secrets
+- Preventing duplicate financial effects
+- Recording failures and recovery status
+
+The backend shall not delegate authoritative financial decisions to the browser.
+
+---
+
+## Trusted Execution Boundary
+
+The trusted backend boundary includes:
+
+- Server Components performing protected data retrieval
+- Server Actions performing approved mutations
+- Route Handlers exposing application interfaces
+- Server-only service functions
+- Database functions where explicitly approved
+- Background jobs operating with restricted credentials
+- Privileged storage operations
+
+The following must remain outside the browser:
+
+- Service-role credentials
+- Privileged database access
+- Authorization rules
+- Financial calculations
+- Import parsing and persistence
+- Sensitive file access
+- Audit creation
+- Administrative operations
+- Secret configuration
+
+The browser must always be treated as untrusted.
+
+---
+
+## Request Processing Pipeline
+
+Every protected backend request should follow a consistent sequence.
+
+```mermaid
+flowchart LR
+    Request[Incoming Request]
+    Authenticate[Authenticate]
+    Validate[Validate Input]
+    Authorize[Authorize]
+    Execute[Execute Application Workflow]
+    Domain[Apply Domain Rules]
+    Persist[Persist Transactionally]
+    Audit[Create Audit Record]
+    Respond[Return Safe Response]
+
+    Request --> Authenticate
+    Authenticate --> Validate
+    Validate --> Authorize
+    Authorize --> Execute
+    Execute --> Domain
+    Domain --> Persist
+    Persist --> Audit
+    Audit --> Respond
+```
+
+A request must not proceed to protected persistence unless authentication, validation, and authorization have succeeded.
+
+---
+
+## Backend Layers
+
+### Transport Layer
+
+The Transport Layer receives requests from the frontend or approved external clients.
+
+Potential transport mechanisms include:
+
+- Server Actions
+- Route Handlers
+- Server-rendered page requests
+- Background-job invocations
+- Future webhook handlers
+- Future API integrations
+
+Responsibilities include:
+
+- Parsing request structure
+- Extracting authenticated context
+- Applying request-level limits
+- Mapping transport input into validated application commands or queries
+- Returning safe transport responses
+
+The Transport Layer shall not contain authoritative financial business logic.
+
+### Application Service Layer
+
+Application Services coordinate complete user workflows.
+
+Examples include:
+
+- Import a transaction file
+- Resolve a review item
+- Create a monthly budget
+- Record a debt payment
+- Update an asset valuation
+- Generate a net worth snapshot
+- Record a support payment
+- Export a financial report
+- Update dashboard preferences
+
+Application Services are responsible for:
+
+- Accepting validated commands or queries
+- Enforcing use-case authorization
+- Calling Domain Services
+- Coordinating repositories
+- Managing database transactions
+- Creating audit events
+- Scheduling background work
+- Returning typed results
+
+Application Services define workflow boundaries.
+
+### Domain Service Layer
+
+Domain Services contain deterministic financial behavior.
+
+Potential services include:
+
+- Transaction Normalization Service
+- Duplicate Detection Service
+- Transfer Matching Service
+- Classification Service
+- Budget Calculation Service
+- Bill Reconciliation Service
+- Debt Payoff Service
+- Net Worth Calculation Service
+- Goal Progress Service
+- Support Balance Service
+- Reporting Aggregation Service
+- Dashboard Query Service
+
+Domain Services shall:
+
+- Avoid framework-specific dependencies
+- Use validated inputs
+- Return typed outputs
+- Return explicit domain errors
+- Remain deterministic for authoritative calculations
+- Remain testable without user-interface execution
+- Avoid direct access to browser state
+- Avoid direct use of privileged credentials
+
+### Repository Layer
+
+Repositories provide narrow persistence interfaces.
+
+Examples include:
+
+- Account Repository
+- Import Repository
+- Transaction Repository
+- Merchant Repository
+- Classification Rule Repository
+- Review Repository
+- Budget Repository
+- Bill Repository
+- Debt Repository
+- Asset Repository
+- Net Worth Repository
+- Goal Repository
+- Dashboard Repository
+- Audit Repository
+
+Repositories shall:
+
+- Enforce owner scope
+- Use parameterized queries
+- Return typed records
+- Support transactional use
+- Avoid unrestricted query exposure
+- Preserve historical relationships
+- Map persistence failures into structured errors
+- Avoid embedding presentation concerns
+
+Repositories should expose meaningful domain operations rather than generic unrestricted database access.
+
+### Infrastructure Layer
+
+Infrastructure adapters connect Athena to external or vendor-specific systems.
+
+Potential adapters include:
+
+- Supabase authentication adapter
+- PostgreSQL client adapter
+- Private storage adapter
+- Logging adapter
+- Monitoring adapter
+- Email adapter
+- Background-job adapter
+- Clock adapter
+- Identifier generator
+- File parser registry
+- Future AI provider adapter
+- Future financial-institution adapter
+
+Infrastructure details shall remain replaceable where practical.
+
+Core financial logic should not depend directly on vendor-specific SDK behavior.
+
+---
+
+## Command and Query Separation
+
+Athena should distinguish commands from queries.
+
+### Commands
+
+Commands request a state change.
+
+Examples include:
+
+- Create transaction
+- Update classification
+- Activate budget
+- Record debt payment
+- Update dashboard layout
+- Delete export
+- Resolve review item
+
+Commands shall:
+
+- Require authorization
+- Validate intent
+- Enforce invariants
+- Use transactional persistence where required
+- Create audit records
+- Return explicit outcomes
+
+### Queries
+
+Queries retrieve or derive data.
+
+Examples include:
+
+- Get dashboard summary
+- List transactions
+- Calculate spending by category
+- Get debt payoff projection
+- Get net worth history
+- Generate report data
+
+Queries shall:
+
+- Enforce owner scope
+- Return only required fields
+- Avoid unnecessary sensitive data
+- Use consistent filtering
+- Avoid modifying authoritative state
+
+Athena does not require full CQRS infrastructure in Version 1.
+
+The separation is conceptual and organizational.
+
+---
+
+## Authentication
+
+The backend shall verify authenticated identity before protected operations.
+
+Authentication responsibilities include:
+
+- Session validation
+- Token validation
+- Session-expiration handling
+- Reauthentication where required
+- Multi-factor authentication support
+- Secure logout handling
+- Protection against invalid or revoked sessions
+
+Authentication failures must return safe, non-sensitive responses.
+
+Authentication must not be assumed because a page was previously loaded.
+
+---
+
+## Authorization
+
+Authorization determines whether an authenticated actor may perform a specific action.
+
+Athena shall use defense in depth through:
+
+- Application-level authorization
+- Owner-scoped repositories
+- PostgreSQL Row Level Security
+- Private storage policies
+- Restricted privileged operations
+
+Authorization checks should consider:
+
+- Owner identity
+- Resource ownership
+- Requested action
+- Record state
+- Required privilege
+- Security-sensitive context
+
+Client-supplied ownership identifiers must not be trusted without independent verification.
+
+---
+
+## Validation
+
+Athena shall validate all untrusted input at runtime.
+
+Validation layers include:
+
+- Transport validation
+- Application validation
+- Domain validation
+- Persistence constraints
+
+Validation applies to:
+
+- Form input
+- Request parameters
+- Uploaded files
+- CSV records
+- Query filters
+- Identifiers
+- Dates
+- Money values
+- Status transitions
+- Environment configuration
+- External service responses
+
+TypeScript types do not replace runtime validation.
+
+---
+
+## Financial Transactions and Atomicity
+
+Financially significant multi-step operations should execute atomically.
+
+Examples include:
+
+- Importing validated transactions and recording import results
+- Linking a transfer pair
+- Recording a debt payment and updating balance history
+- Closing a budget period
+- Creating a net worth snapshot
+- Resolving review and applying classification
+- Recording support payment and updating outstanding balance
+- Creating an export and its audit record
+
+Athena shall prefer all-or-nothing persistence for related financial state.
+
+Partial updates must not silently create inconsistent financial records.
+
+---
+
+## Domain Services
+
+Domain Services shall implement financial rules that span entities or repositories.
+
+### Transaction Normalization Service
+
+Responsibilities may include:
+
+- Normalizing dates
+- Normalizing signed amounts
+- Normalizing descriptions
+- Mapping account context
+- Producing canonical transaction candidates
+
+### Duplicate Detection Service
+
+Responsibilities may include:
+
+- File fingerprinting
+- Transaction fingerprinting
+- Duplicate-candidate scoring
+- Retry protection
+- Explicit duplicate resolution
+
+### Transfer Matching Service
+
+Responsibilities may include:
+
+- Matching opposite-signed transactions
+- Matching account ownership
+- Evaluating date proximity
+- Preventing income and expense inflation
+- Preserving transfer relationships
+
+### Classification Service
+
+Responsibilities may include:
+
+- Applying precedence rules
+- Evaluating merchant rules
+- Producing explanation metadata
+- Identifying conflicts
+- Creating review items
+
+### Budget Calculation Service
+
+Responsibilities may include:
+
+- Calculating available income
+- Applying zero-based allocations
+- Calculating actual spending
+- Handling rollovers
+- Preserving closed-period history
+
+### Debt Payoff Service
+
+Responsibilities may include:
+
+- Calculating payoff progress
+- Modeling scenarios
+- Projecting payoff dates
+- Documenting assumptions
+- Separating actual payment history from projections
+
+### Net Worth Calculation Service
+
+Responsibilities may include:
+
+- Aggregating dated asset values
+- Aggregating dated liabilities
+- Preventing double counting
+- Creating immutable snapshots
+
+---
+
+## Import Processing
+
+The import pipeline is one of Athena's most security-sensitive and financially significant workflows.
+
+```mermaid
+flowchart LR
+    Upload[Upload]
+    ValidateFile[Validate File]
+    Identify[Identify Source]
+    Parse[Parse Rows]
+    Normalize[Normalize]
+    Fingerprint[Fingerprint]
+    Detect[Detect Duplicates and Transfers]
+    Classify[Apply Rules]
+    Review[Create Review Items]
+    Persist[Persist Authoritative Records]
+    Summarize[Create Import Summary]
+    Audit[Create Audit Record]
+
+    Upload --> ValidateFile
+    ValidateFile --> Identify
+    Identify --> Parse
+    Parse --> Normalize
+    Normalize --> Fingerprint
+    Fingerprint --> Detect
+    Detect --> Classify
+    Classify --> Review
+    Classify --> Persist
+    Review --> Persist
+    Persist --> Summarize
+    Summarize --> Audit
+```
+
+Import processing shall:
+
+- Treat files as untrusted
+- Validate format and size
+- Validate content
+- Prevent path manipulation
+- Use source-specific parsers
+- Preserve source lineage
+- Reject malformed records safely
+- Prevent duplicate effects
+- Produce explicit row outcomes
+- Record processing version
+- Record import status
+- Avoid sensitive logging
+- Support safe retry
+
+---
+
+## Classification and Review
+
+Classification shall use deterministic rules before optional assisted suggestions.
+
+The backend must record:
+
+- Rule evaluated
+- Rule priority
+- Rule version
+- Classification result
+- Whether review is required
+- Review decision
+- Actor responsible
+- Timestamp
+
+AI-assisted suggestions, if introduced, shall:
+
+- Remain non-authoritative
+- Include a confidence indicator
+- Include explanation metadata where practical
+- Require approval before modifying authoritative records
+- Never bypass review for sensitive or ambiguous classifications
+
+---
+
+## Reporting and Dashboard Queries
+
+Reporting Services shall produce trusted aggregates for:
+
+- Dashboard widgets
+- Financial reports
+- Data exports
+- Monthly summaries
+- Spending views
+- Income views
+- Debt progress
+- Net worth trends
+- Goal progress
+- Specialized legal, medical, and support reports
+
+Reporting queries shall:
+
+- Enforce authorization
+- Use authoritative records
+- Apply filters consistently
+- Exclude internal transfers where required
+- Distinguish reimbursements from income
+- Avoid duplicate specialized totals
+- Return typed results
+- Define freshness and cache behavior
+- Avoid exposing unnecessary detail
+
+Dashboard customization must not alter authoritative reporting logic.
+
+---
+
+## Audit Logging
+
+Audit logging shall be separate from ordinary operational logging.
+
+Audit records should capture:
+
+- Actor
+- Action
+- Resource type
+- Resource identifier
+- Timestamp
+- Correlation identifier
+- Source
+- Previous state where appropriate
+- Resulting state where appropriate
+- Outcome
+- Failure status where appropriate
+
+Critical mutations should not silently succeed if required audit recording fails.
+
+Audit records must avoid storing unnecessary sensitive details.
+
+---
+
+## Background Processing
+
+Background processing may be used for:
+
+- Large imports
+- Data exports
+- Monthly snapshots
+- Scheduled reports
+- Backup verification
+- Notification generation
+- Future financial-institution synchronization
+
+Background jobs shall include:
+
+- Unique job identifier
+- Owner context
+- Idempotency key
+- Status
+- Attempt count
+- Retry limit
+- Created timestamp
+- Started timestamp
+- Completed timestamp
+- Failure summary
+- Correlation identifier
+
+Background jobs must be safe to retry and must not create duplicate financial effects.
+
+---
+
+## File Processing
+
+File processing shall include:
+
+- File-size limits
+- File-type validation
+- Content inspection
+- Extension checks
+- Filename normalization
+- Source parser selection
+- Parser versioning
+- Secure temporary handling
+- Private storage where retained
+- Retention and deletion rules
+- Ownership checks
+- Import audit linkage
+
+Original filenames shall not be trusted as storage paths.
+
+Files shall not be made publicly accessible.
+
+---
+
+## Error Model
+
+Athena shall use structured errors.
+
+Potential error categories include:
+
+- Validation Error
+- Authentication Error
+- Authorization Error
+- Not Found Error
+- Conflict Error
+- Domain Rule Error
+- Import Error
+- Persistence Error
+- Infrastructure Error
+- Rate Limit Error
+- Unexpected Error
+
+Errors should include:
+
+- Stable error code
+- Safe user message
+- Correlation identifier
+- Internal diagnostic context where appropriate
+
+Errors must not expose:
+
+- Credentials
+- Stack traces
+- SQL statements
+- Internal policy details
+- Sensitive financial values
+- Storage paths
+- Service-role behavior
+
+---
+
+## Idempotency
+
+Athena shall use idempotency controls for operations that may be retried.
+
+Examples include:
+
+- File imports
+- Background jobs
+- Export generation
+- Payment recording
+- Webhook processing
+- Future bank synchronization
+- Snapshot generation
+
+Idempotency may use:
+
+- Request keys
+- File fingerprints
+- Transaction fingerprints
+- Unique database constraints
+- Job identifiers
+- Operation hashes
+
+Retrying an operation must not create duplicate financial effects.
+
+---
+
+## Concurrency Control
+
+Athena must account for concurrent updates.
+
+Potential risks include:
+
+- Simultaneous transaction edits
+- Duplicate review resolution
+- Concurrent budget activation
+- Overlapping balance updates
+- Duplicate import completion
+- Conflicting dashboard preference updates
+
+Potential controls include:
+
+- Database transactions
+- Unique constraints
+- Version columns
+- Updated-at comparison
+- Optimistic concurrency
+- Explicit record locking where justified
+
+Silent last-write-wins behavior should be avoided for financially significant records.
+
+---
+
+## Caching
+
+Caching may be used for derived or read-heavy data.
+
+Potential cache targets include:
+
+- Dashboard summaries
+- Reporting aggregates
+- Category lists
+- Merchant lists
+- Static configuration
+
+Caching shall not:
+
+- Bypass authorization
+- Return cross-user data
+- Hide important state changes
+- Become the authoritative record
+- Introduce stale financial calculations without visible freshness rules
+
+Version 1 may avoid dedicated caching until performance data demonstrates a need.
+
+---
+
+## Rate Limiting
+
+Rate limiting should protect:
+
+- Authentication endpoints
+- File uploads
+- Import processing
+- Export generation
+- Expensive reports
+- Future AI requests
+- Future webhook handlers
+
+Rate limits must not interfere with normal personal use.
+
+Security-sensitive endpoints may require stricter limits than ordinary reads.
+
+---
+
+## Observability
+
+Operational observability should include:
+
+- Request duration
+- Error counts
+- Import duration
+- Job status
+- Failure rates
+- Deployment health
+- Database connectivity
+- Storage availability
+
+Observability must exclude or redact:
+
+- Transaction descriptions
+- Full account identifiers
+- Legal details
+- Medical details
+- Support details
+- Uploaded file contents
+- Credentials
+- Secret values
+
+Audit logging and operational logging must remain separate.
+
+---
+
+## Configuration and Secrets
+
+Backend configuration shall be validated before use.
+
+Secrets shall:
+
+- Remain outside source control
+- Use environment-specific storage
+- Remain server-only
+- Be rotated when exposure is suspected
+- Never appear in ordinary logs
+- Never be included in client bundles
+- Use least-privilege credentials
+
+Development, preview, and production environments shall use separate credentials.
+
+---
+
+## API and Server Interface Strategy
+
+Athena may use:
+
+- Server Components for protected reads
+- Server Actions for trusted form mutations
+- Route Handlers for uploads, exports, integrations, and explicit API behavior
+- Server-only service functions for internal workflows
+
+Interface selection should depend on:
+
+- Security
+- Reusability
+- Request complexity
+- File-handling requirements
+- External integration needs
+- Testing
+- Observability
+
+Athena shall not expose unrestricted database operations directly to the browser.
+
+Final interface conventions may receive a separate ADR if implementation reveals meaningful tradeoffs.
+
+---
+
+## Provisional Folder Structure
+
+```
+src/
+├── application/
+│   ├── commands/
+│   ├── queries/
+│   ├── workflows/
+│   └── authorization/
+├── domains/
+│   ├── accounts/
+│   ├── imports/
+│   ├── transactions/
+│   ├── merchants/
+│   ├── classification/
+│   ├── review/
+│   ├── budgets/
+│   ├── bills/
+│   ├── debts/
+│   ├── assets/
+│   ├── net-worth/
+│   ├── goals/
+│   ├── reporting/
+│   ├── dashboard/
+│   ├── legal/
+│   ├── medical/
+│   ├── support/
+│   └── audit/
+├── infrastructure/
+│   ├── auth/
+│   ├── database/
+│   ├── storage/
+│   ├── logging/
+│   ├── monitoring/
+│   ├── jobs/
+│   └── config/
+├── repositories/
+├── server/
+│   ├── actions/
+│   ├── routes/
+│   └── middleware/
+├── lib/
+│   ├── errors/
+│   ├── validation/
+│   ├── money/
+│   ├── dates/
+│   └── identifiers/
+└── types/
+```
+
+This structure is provisional.
+
+Folders should be created only when implementation requires them.
+
+---
+
+## Dependency Rules
+
+```mermaid
+flowchart LR
+    Transport --> Application
+    Application --> Domain
+    Application --> RepositoryInterfaces[Repository Interfaces]
+    RepositoryImplementations[Repository Implementations] --> RepositoryInterfaces
+    RepositoryImplementations --> Database
+    Infrastructure --> Application
+    Infrastructure --> RepositoryImplementations
+    Domain --> Shared[Shared Types and Utilities]
+```
+
+Rules include:
+
+- Transport depends on Application Services.
+- Application Services depend on Domain Services and repository interfaces.
+- Domain Services must not depend on transport frameworks.
+- Domain Services must not depend directly on Supabase or Vercel.
+- Repository implementations may depend on database infrastructure.
+- Infrastructure details must not leak into domain logic.
+- Circular dependencies are prohibited.
+- Server-only modules must not be imported into client components.
+- Shared utilities must remain focused and must not become a miscellaneous dumping ground.
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+Unit tests shall cover:
+
+- Financial calculations
+- Normalization
+- Duplicate detection
+- Transfer matching
+- Classification precedence
+- Budget logic
+- Debt payoff logic
+- Net worth calculations
+- Support balance calculations
+- State transitions
+- Error mapping
+
+### Integration Tests
+
+Integration tests shall cover:
+
+- Repository behavior
+- Database constraints
+- Transaction rollback
+- Row Level Security
+- Storage policies
+- Import persistence
+- Audit creation
+- Idempotency
+- Concurrency controls
+
+### Contract Tests
+
+Contract tests may cover:
+
+- Transport input
+- Application command schemas
+- Query output structures
+- External adapter behavior
+
+### End-to-End Tests
+
+End-to-end tests shall cover:
+
+- Authentication
+- Protected reads
+- File import
+- Review resolution
+- Budget creation
+- Debt updates
+- Net worth snapshots
+- Dashboard queries
+- Data export
+- Unauthorized access
+
+Synthetic and sanitized data shall be used.
+
+---
+
+## Security Considerations
+
+Backend security risks include:
+
+- Broken authorization
+- Row Level Security bypass
+- Service-role misuse
+- Insecure file parsing
+- Injection
+- Sensitive logging
+- Duplicate financial effects
+- Missing audit records
+- Client-supplied ownership manipulation
+- Insecure direct object references
+- Preview environment access to production
+- Unvalidated external responses
+- Overly broad storage permissions
+
+Required controls include:
+
+- Server-side authorization
+- Owner-scoped repositories
+- Runtime validation
+- Parameterized queries
+- Private storage
+- Least privilege
+- Audit logging
+- Idempotency
+- Safe error handling
+- Secrets management
+- Automated security testing
+- Dependency scanning
+- Static analysis
+- Secret scanning
+
+---
+
+## Performance Considerations
+
+Backend performance objectives include:
+
+- Efficient monthly imports
+- Paginated transaction queries
+- Indexed reporting paths
+- Avoidance of unnecessary full-table scans
+- Batched persistence where safe
+- Efficient dashboard aggregates
+- Clear background-job boundaries
+- Measured optimization rather than premature complexity
+
+Performance improvements must not compromise authorization, correctness, or auditability.
+
+---
+
+## Requirement Traceability
+
+| Backend Area | Related Requirements |
+|---|---|
+| Request processing | FR-001 through FR-031, NFR-005, NFR-006 |
+| Authentication | FR-025, NFR-003 |
+| Authorization | FR-026, NFR-001, NFR-002 |
+| Import processing | FR-001 through FR-005, FR-030, NFR-005 through NFR-009 |
+| Classification and review | FR-007 through FR-010, FR-031, NFR-018 |
+| Budget services | FR-011 through FR-013 |
+| Reporting services | FR-014 through FR-017, FR-028 |
+| Debt services | FR-018 through FR-019 |
+| Asset and net worth services | FR-020 through FR-022 |
+| Goal services | FR-023 through FR-024 |
+| Audit logging | FR-027, NFR-005, NFR-018 |
+| Data export | FR-028, NFR-017 |
+| Recovery | FR-029, NFR-007 |
+| Dashboard queries | FR-014, FR-032, NFR-008, NFR-013 through NFR-018 |
+| File handling | FR-001, FR-002, FR-030 |
+| Testing | NFR-010 through NFR-012 |
+| Scalability | NFR-013, NFR-014 |
+| Security | NFR-001 through NFR-004 |
+| Performance | NFR-008, NFR-009 |
+
+---
+
+## Deferred Decisions
+
+The following backend decisions remain open:
+
+- Server Actions versus Route Handlers by use case
+- Runtime validation library
+- Database query builder or ORM
+- Repository abstraction depth
+- Result and error pattern
+- Background-job provider
+- Queue infrastructure
+- Logging provider
+- Monitoring provider
+- Rate-limiting provider
+- Cache provider
+- Request-correlation implementation
+- Idempotency-key storage
+- Concurrency-control strategy
+- API versioning
+- Webhook framework
+- Export format implementation
+- Import parser registry design
+- Domain-event persistence
+- Email provider
+- Notification provider
+- AI provider
+- AI request redaction strategy
+- File-retention duration
+- Job-retention duration
+- Audit-retention duration
+
+These decisions shall be made only when implementation requires them and documented through ADRs where appropriate.
+
+---
+
+## Related Documents
+
+- docs/product-requirements.md
+- docs/architecture/README.md
+- docs/architecture/engineering-principles.md
+- docs/architecture/system-architecture.md
+- docs/architecture/application-architecture.md
+- docs/architecture/frontend-architecture.md
+- docs/architecture/domain-model.md
+- docs/adr/README.md
+- docs/adr/0002-initial-technology-stack.md
+
+---
+
+## Revision History
+
+| Version | Date | Author | Summary |
+|---|---|---|---|
+| 1.0.0 | 2026-07-28 | Caitlin Gillum | Defined Athena's trusted backend architecture, request-processing pipeline, application and domain services, persistence boundaries, import workflow, authorization, validation, audit logging, idempotency, error handling, and backend security model. |
