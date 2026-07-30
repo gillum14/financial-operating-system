@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Base */
+  --background: #0b1220;
+  --surface: #16202d;
+  --surface-elevated: #1c2836;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Borders */
+  --border: #273548;
+  --border-subtle: #1f2b3a;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+  /* Typography */
+  --foreground: #f4f7fb;
+  --foreground-secondary: #c3ccd7;
+  --foreground-muted: #8795a8;
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Brand */
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+
+  /* Status */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Chart categorical palette (fixed order — do not reorder per-chart) */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+
+  /* Chart chrome */
+  --chart-grid: #273548;
+  --chart-tooltip-bg: #1c2836;
+
+  /* Interactive surfaces */
+  --surface-hover: #1f2b3a;
+
+  /* Radius */
+  --radius: 14px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.25);
 }

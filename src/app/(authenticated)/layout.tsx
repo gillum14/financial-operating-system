@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/navigation/app-header";
 import { AppSidebar } from "@/components/navigation/app-sidebar";
+import { currentUser } from "@/lib/session";
 
 type AuthenticatedLayoutProps = {
   children: ReactNode;
@@ -9,8 +10,8 @@ type AuthenticatedLayoutProps = {
 
 export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-950">
-      <AppSidebar />
+    <div className="flex min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <AppSidebar user={currentUser} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader />
