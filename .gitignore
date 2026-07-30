@@ -141,3 +141,18 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# macOS
+.DS_Store
+
+# Certificates and private keys
+*.pem
+
+# pnpm debug logs
+.pnpm-debug.log*
+
+# Vercel
+.vercel/
+
+# Next.js generated TypeScript declarations
+next-env.d.ts
