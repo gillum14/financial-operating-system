@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -71,13 +72,14 @@ const navGroups: NavGroup[] = [
 
 function AthenaMark() {
   return (
-    <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0" aria-hidden="true">
-      <rect width="32" height="32" rx="9" fill="var(--primary)" />
-      <path
-        d="M14.5 7 L16 7 L13 25 L8 25 Z M16 7 L17.5 7 L24 25 L19 25 Z M10 17 H22 V20 H10 Z"
-        fill="white"
-      />
-    </svg>
+    <Image
+      src="/images/logo/athena-icon.png"
+      alt=""
+      width={32}
+      height={32}
+      priority
+      className="h-8 w-8 shrink-0 object-contain"
+    />
   );
 }
 
@@ -172,10 +174,15 @@ export function AppSidebar({ user }: { user: CurrentUser }) {
           {user.initials}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-[var(--foreground)]">{user.name}</span>
+          <span className="block truncate text-sm font-medium text-[var(--foreground)]">
+            {user.name}
+          </span>
           <span className="block truncate text-xs text-[var(--foreground-muted)]">{user.role}</span>
         </span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.75} />
+        <ChevronsUpDown
+          className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]"
+          strokeWidth={1.75}
+        />
       </button>
     </aside>
   );

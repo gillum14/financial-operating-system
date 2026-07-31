@@ -1,14 +1,19 @@
-import { Banknote, Gauge, PieChart, Target, TrendingUp } from "lucide-react";
+import { Banknote, PieChart, Target, TrendingUp } from "lucide-react";
 
 import StatCard, { StatDelta } from "@/components/ui/stat-card";
 import ProgressBar from "@/components/ui/progress-bar";
+import { currentUser } from "@/lib/session";
 import {
   accounts,
   budgetProgress,
   cashFlowPeriod,
   cashFlowSeries,
-  financialReadiness,
+  confidenceScore,
+  confidenceTrends,
+  dailyInsight,
+  encouragementStatement,
   lastUpdatedLabel,
+  missionProgress,
   missionStatus,
   operationalHighlights,
   priorityAction,
@@ -19,7 +24,9 @@ import {
   statSummaries,
   upcomingObjectives,
 } from "@/features/dashboard/mock-data";
+import { ConfidenceScoreCard } from "@/features/dashboard/components/confidence-score-card";
 import { FinancialBriefSummary } from "@/features/dashboard/components/financial-brief-summary";
+import { MissionProgress } from "@/features/dashboard/components/mission-progress";
 import { FinancialOverviewCard } from "@/features/dashboard/components/financial-overview-card";
 import { BudgetProgressCard } from "@/features/dashboard/components/budget-progress-card";
 import { SpendingByCategoryCard } from "@/features/dashboard/components/spending-by-category-card";
@@ -31,34 +38,45 @@ import { DashboardFooter } from "@/features/dashboard/components/dashboard-foote
 
 const [netWorth, monthlyCashFlow, investments] = statSummaries;
 
+function getGreeting(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function DashboardPage() {
+  const greeting = getGreeting(new Date().getHours());
+  const firstName = currentUser.name.split(" ")[0];
+
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-2xl">
+      <section className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-md">
           <p className="text-sm font-medium tracking-[0.16em] text-[var(--primary)] uppercase">Dashboard</p>
 
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--foreground)]">
             Financial Brief
           </h1>
 
-          <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-            Here is your operational overview. Focus, execute, achieve mission success.
+          <p className="mt-4 text-xl font-semibold text-[var(--foreground)]">
+            {greeting}, {firstName}.
           </p>
 
-          <div className="mt-5">
-            <FinancialBriefSummary highlights={operationalHighlights} priorityAction={priorityAction} />
-          </div>
+          <p className="mt-1 text-sm text-[var(--foreground-secondary)]">{encouragementStatement}</p>
+
+          <p className="mt-3 flex items-start gap-2 text-sm text-[var(--foreground-secondary)]">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--success)]" />
+            <span>{dailyInsight}</span>
+          </p>
+
+          <MissionProgress missions={missionProgress} />
         </div>
 
-        <StatCard
-          label="Financial Readiness"
-          value={`${financialReadiness.score}/100`}
-          icon={Gauge}
-          className="lg:w-64 shrink-0"
-        >
-          <p className="text-sm text-[var(--success)]">{financialReadiness.label}</p>
-        </StatCard>
+        <div className="lg:max-w-xs lg:flex-1 lg:self-center">
+          <FinancialBriefSummary highlights={operationalHighlights} priorityAction={priorityAction} />
+        </div>
+
+        <ConfidenceScoreCard score={confidenceScore} trends={confidenceTrends} className="lg:w-64 shrink-0" />
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">

@@ -4,6 +4,9 @@ import type {
   BudgetProgress,
   CashFlowPoint,
   CategorySpend,
+  ConfidenceScore,
+  ConfidenceTrend,
+  MissionProgressItem,
   MissionStatusItem,
   StatSummary,
   UpcomingObjective,
@@ -171,15 +174,29 @@ export const missionStatus: MissionStatusItem[] = [
   },
 ];
 
-export const financialReadiness = {
+export const confidenceScore: ConfidenceScore = {
   score: 92,
   label: "Strong financial position",
 };
 
+export const confidenceTrends: ConfidenceTrend[] = [
+  { label: "This Month", value: 5 },
+  { label: "Last 3 Months", value: 14 },
+  { label: "Last Year", value: 37 },
+];
+
+export const encouragementStatement = "You're making strong progress toward your financial goals.";
+
+export const dailyInsight = "Investments continue trending upward, up 2.23% this month.";
+
+export const missionProgress: MissionProgressItem[] = [
+  { id: "emergency-fund", label: "Emergency Fund", percent: 72 },
+  { id: "vacation-fund", label: "Vacation Fund", percent: 48 },
+];
+
 export const operationalHighlights: string[] = [
-  "Cash flow is positive — $3,240 net for May, up 21.9% from last month.",
+  "Cash flow is positive — $3,240 net for May, up 21.9%.",
   "Net worth grew 2.01% ($8,125) over the last 30 days.",
-  "Budget is on pace: 82% used with 8 days remaining in May.",
 ];
 
 const priorityStatus = missionStatus.find((item) => item.level === "needs-attention");

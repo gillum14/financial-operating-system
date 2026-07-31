@@ -19,11 +19,11 @@ function CustomTooltip({ active, payload }: TooltipContentProps) {
   const category = entry.payload as CategorySpend;
 
   return (
-    <div className="rounded-[calc(var(--radius)-6px)] border border-[var(--border)] bg-[var(--chart-tooltip-bg)] px-3 py-2 shadow-[var(--shadow-md)]">
-      <p className="text-sm font-medium" style={{ color: category.color }}>
+    <div className="max-w-[9.5rem] rounded-[calc(var(--radius)-6px)] border border-[var(--border)] bg-[var(--chart-tooltip-bg)] px-2.5 py-1.5 shadow-[var(--shadow-md)]">
+      <p className="truncate text-sm font-medium" style={{ color: category.color }}>
         {category.category}
       </p>
-      <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+      <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
         ${category.amount.toLocaleString()} · {category.percent}%
       </p>
     </div>
@@ -51,9 +51,16 @@ export function SpendingByCategoryChart({
             stroke="var(--surface)"
             strokeWidth={2}
             shape={CategorySector}
+            activeShape={false}
           />
 
-          <Tooltip content={CustomTooltip} />
+          <Tooltip
+            content={CustomTooltip}
+            allowEscapeViewBox={{ x: true, y: true }}
+            position={{ x: 4, y: 118 }}
+            isAnimationActive={false}
+            wrapperStyle={{ zIndex: 20 }}
+          />
         </PieChart>
       </ResponsiveContainer>
 

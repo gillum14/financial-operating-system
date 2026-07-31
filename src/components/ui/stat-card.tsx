@@ -8,12 +8,11 @@ type StatCardProps = {
   value: string;
   icon: LucideIcon;
   children?: ReactNode;
-  className?: string;
 };
 
-export default function StatCard({ label, value, icon: Icon, children, className = "" }: StatCardProps) {
+export default function StatCard({ label, value, icon: Icon, children }: StatCardProps) {
   return (
-    <Card className={className}>
+    <Card>
       <div className="flex items-start justify-between">
         <p className="text-xs font-semibold tracking-[0.12em] text-[var(--foreground-muted)] uppercase">
           {label}
