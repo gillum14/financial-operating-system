@@ -156,3 +156,9 @@ vite.config.ts.timestamp-*
 
 # Next.js generated TypeScript declarations
 next-env.d.ts
+
+# VSCode Counter reports
+.VSCodeCounter/
+/.VSCodeCounter
+/.VSCodeCounter
+/.VSCodeCounter
