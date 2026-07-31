@@ -5,7 +5,8 @@ import { categories } from "./categories";
 import { timestamps } from "./shared-columns";
 import { users } from "./users";
 
-export type TransactionType = "income" | "expense" | "transfer";
+export const TRANSACTION_TYPES = ["income", "expense", "transfer"] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
 export const transactions = pgTable(
   "transactions",

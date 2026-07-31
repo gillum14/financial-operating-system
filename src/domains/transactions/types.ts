@@ -1,5 +1,11 @@
-import type { NewTransaction, Transaction, TransactionType } from "@/db/schema/transactions";
+import {
+  TRANSACTION_TYPES,
+  type NewTransaction,
+  type Transaction,
+  type TransactionType,
+} from "@/db/schema/transactions";
 
+export { TRANSACTION_TYPES };
 export type { Transaction, TransactionType };
 
 export type TransactionCreateInput = Omit<NewTransaction, "id" | "createdAt" | "updatedAt" | "deletedAt">;

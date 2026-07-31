@@ -7,7 +7,8 @@ import { users } from "./users";
 // Generic, provider-agnostic connection record. No provider-specific fields
 // (e.g. Plaid access tokens/item IDs) belong here — those arrive with the
 // provider integration itself in a later branch.
-export type DataProviderConnectionStatus = "active" | "inactive" | "error";
+export const DATA_PROVIDER_CONNECTION_STATUSES = ["active", "inactive", "error"] as const;
+export type DataProviderConnectionStatus = (typeof DATA_PROVIDER_CONNECTION_STATUSES)[number];
 
 export const dataProviderConnections = pgTable(
   "data_provider_connections",

@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { institutions } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { InstitutionRepository } from "@/domains/institutions/repository";
 import type { Institution, InstitutionCreateInput, InstitutionUpdateInput } from "@/domains/institutions/types";
 
@@ -34,7 +35,7 @@ export class DrizzleInstitutionRepository implements InstitutionRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`Institution ${id} not found`);
+      throw new NotFoundError(`Institution ${id} not found`);
     }
 
     return row;
