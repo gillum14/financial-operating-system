@@ -1,27 +1,20 @@
 import { Banknote, PieChart, Target, TrendingUp } from "lucide-react";
 
-import StatCard, { StatDelta } from "@/components/ui/stat-card";
+import StatCard, { StatCaption } from "@/components/ui/stat-card";
 import ProgressBar from "@/components/ui/progress-bar";
 import { currentUser } from "@/lib/session";
+import { getDashboardSnapshot } from "@/composition/dashboard-query";
+import { resolveDevelopmentOwnerId } from "@/composition/development-owner";
 import {
-  accounts,
   budgetProgress,
-  cashFlowPeriod,
-  cashFlowSeries,
   confidenceScore,
   confidenceTrends,
   dailyInsight,
   encouragementStatement,
-  lastUpdatedLabel,
   missionProgress,
   missionStatus,
   operationalHighlights,
   priorityAction,
-  recentActivity,
-  spendingByCategory,
-  spendingTotal,
-  spendingUpdatedLabel,
-  statSummaries,
   upcomingObjectives,
 } from "@/features/dashboard/mock-data";
 import { ConfidenceScoreCard } from "@/features/dashboard/components/confidence-score-card";
@@ -36,7 +29,10 @@ import { AccountsOverview } from "@/features/dashboard/components/accounts-overv
 import { RecentActivity } from "@/features/dashboard/components/recent-activity";
 import { DashboardFooter } from "@/features/dashboard/components/dashboard-footer";
 
-const [netWorth, monthlyCashFlow, investments] = statSummaries;
+// This page renders live, per-owner financial data resolved at request
+// time (see resolveDevelopmentOwnerId / getDashboardSnapshot below) — it
+// must never be statically prerendered or cached across owners.
+export const dynamic = "force-dynamic";
 
 function getGreeting(hour: number) {
   if (hour < 12) return "Good morning";
@@ -44,9 +40,38 @@ function getGreeting(hour: number) {
   return "Good evening";
 }
 
-export default function DashboardPage() {
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+export default async function DashboardPage() {
   const greeting = getGreeting(new Date().getHours());
   const firstName = currentUser.name.split(" ")[0];
+
+  // Sections still sourced from mock data (Confidence Engine, Mission
+  // Engine, budget domain, and objectives/recommendations aren't
+  // implemented yet — out of scope for this slice) are wired below
+  // unchanged; everything else comes from a real DashboardSnapshot.
+  const ownerId = resolveDevelopmentOwnerId();
+  const snapshot = await getDashboardSnapshot(ownerId);
+
+  const asOfLabel = `As of ${new Date().toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+
+  const cashFlowIncome = snapshot.cashFlowSeries.reduce((sum, point) => sum + point.income, 0);
+  const cashFlowExpenses = snapshot.cashFlowSeries.reduce((sum, point) => sum + point.expenses, 0);
+  const cashFlowPeriod = {
+    label: snapshot.netWorth.caption,
+    income: cashFlowIncome,
+    expenses: cashFlowExpenses,
+    netCashFlow: cashFlowIncome - cashFlowExpenses,
+  };
 
   return (
     <div className="space-y-6">
@@ -80,20 +105,16 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net Worth" value={netWorth.value} icon={TrendingUp}>
-          <StatDelta
-            deltaLabel={netWorth.deltaLabel}
-            positive={netWorth.deltaPositive}
-            caption={netWorth.caption}
-          />
+        <StatCard label="Net Worth" value={currencyFormatter.format(snapshot.netWorth.value)} icon={TrendingUp}>
+          <StatCaption caption={asOfLabel} />
         </StatCard>
 
-        <StatCard label="Monthly Cash Flow" value={monthlyCashFlow.value} icon={Banknote}>
-          <StatDelta
-            deltaLabel={monthlyCashFlow.deltaLabel}
-            positive={monthlyCashFlow.deltaPositive}
-            caption={monthlyCashFlow.caption}
-          />
+        <StatCard
+          label="Monthly Cash Flow"
+          value={currencyFormatter.format(snapshot.monthlyCashFlow.value)}
+          icon={Banknote}
+        >
+          <StatCaption caption={asOfLabel} />
         </StatCard>
 
         <StatCard label="Budget Status" value={`${budgetProgress.percent}%`} icon={PieChart}>
@@ -103,27 +124,23 @@ export default function DashboardPage() {
           </p>
         </StatCard>
 
-        <StatCard label="Investments" value={investments.value} icon={Target}>
-          <StatDelta
-            deltaLabel={investments.deltaLabel}
-            positive={investments.deltaPositive}
-            caption={investments.caption}
-          />
+        <StatCard label="Investments" value={currencyFormatter.format(snapshot.investments.value)} icon={Target}>
+          <StatCaption caption={asOfLabel} />
         </StatCard>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
-          <FinancialOverviewCard series={cashFlowSeries} period={cashFlowPeriod} />
+          <FinancialOverviewCard series={snapshot.cashFlowSeries} period={cashFlowPeriod} />
 
           <div className="grid gap-6 md:grid-cols-2">
             <BudgetProgressCard progress={budgetProgress} />
 
             <SpendingByCategoryCard
-              categories={spendingByCategory}
-              total={spendingTotal}
+              categories={snapshot.spendingByCategory}
+              total={snapshot.spendingTotal}
               periodLabel={cashFlowPeriod.label}
-              updatedLabel={spendingUpdatedLabel}
+              updatedLabel={asOfLabel}
             />
           </div>
 
@@ -132,12 +149,12 @@ export default function DashboardPage() {
 
         <div className="space-y-6">
           <UpcomingObjectives objectives={upcomingObjectives} />
-          <AccountsOverview accounts={accounts} />
-          <RecentActivity activity={recentActivity} />
+          <AccountsOverview accounts={snapshot.accounts} />
+          <RecentActivity activity={snapshot.recentActivity} />
         </div>
       </section>
 
-      <DashboardFooter lastUpdatedLabel={lastUpdatedLabel} />
+      <DashboardFooter lastUpdatedLabel={asOfLabel} />
     </div>
   );
 }

@@ -54,3 +54,9 @@ export function StatDelta({ deltaLabel, positive, caption }: StatDeltaProps) {
     </div>
   );
 }
+
+// For stat tiles whose value has no honestly-computable delta (no historical
+// snapshot to compare against) — a caption with no fabricated arrow/percent.
+export function StatCaption({ caption }: { caption: string }) {
+  return <p className="text-xs text-[var(--foreground-muted)]">{caption}</p>;
+}
