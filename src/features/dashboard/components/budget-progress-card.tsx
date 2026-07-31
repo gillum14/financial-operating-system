@@ -1,0 +1,50 @@
+import { ChevronDown } from "lucide-react";
+
+import Card from "@/components/ui/card";
+import CardHeader from "@/components/ui/card-header";
+import { BudgetProgressRing } from "@/components/charts/budget-progress-ring";
+import type { BudgetProgress } from "@/features/dashboard/types";
+
+export function BudgetProgressCard({ progress }: { progress: BudgetProgress }) {
+  return (
+    <Card>
+      <CardHeader title="Budget Progress">
+        <span className="flex items-center gap-1 text-sm text-[var(--foreground-muted)]">
+          {progress.periodLabel}
+          <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.75} />
+        </span>
+      </CardHeader>
+
+      <div className="flex items-center gap-6">
+        <BudgetProgressRing percent={progress.percent} />
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-lg font-semibold text-[var(--foreground)]">
+              ${progress.budgeted.toLocaleString()}
+            </p>
+            <p className="text-xs text-[var(--foreground-muted)]">Budgeted</p>
+          </div>
+
+          <div>
+            <p className="text-lg font-semibold text-[var(--foreground)]">
+              ${progress.spent.toLocaleString()}
+            </p>
+            <p className="text-xs text-[var(--foreground-muted)]">Spent</p>
+          </div>
+
+          <div>
+            <p className="text-lg font-semibold text-[var(--success)]">
+              ${progress.remaining.toLocaleString()}
+            </p>
+            <p className="text-xs text-[var(--foreground-muted)]">Remaining</p>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 text-xs text-[var(--foreground-muted)]">
+        {progress.daysRemaining} days remaining in {progress.periodLabel.split(" ")[0]}
+      </p>
+    </Card>
+  );
+}
