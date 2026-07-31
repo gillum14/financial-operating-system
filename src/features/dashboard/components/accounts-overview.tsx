@@ -40,11 +40,7 @@ export function AccountsOverview({ accounts }: { accounts: Account[] }) {
                 <p className="truncate text-xs text-[var(--foreground-muted)]">{account.institution}</p>
               </div>
 
-              <p
-                className={`shrink-0 text-sm font-medium ${
-                  account.balance < 0 ? "text-[var(--danger)]" : "text-[var(--foreground)]"
-                }`}
-              >
+              <p className="shrink-0 text-sm font-medium text-[var(--foreground)]">
                 {formatBalance(account.balance)}
               </p>
             </li>

@@ -171,6 +171,23 @@ export const missionStatus: MissionStatusItem[] = [
   },
 ];
 
+export const financialReadiness = {
+  score: 92,
+  label: "Strong financial position",
+};
+
+export const operationalHighlights: string[] = [
+  "Cash flow is positive — $3,240 net for May, up 21.9% from last month.",
+  "Net worth grew 2.01% ($8,125) over the last 30 days.",
+  "Budget is on pace: 82% used with 8 days remaining in May.",
+];
+
+const priorityStatus = missionStatus.find((item) => item.level === "needs-attention");
+
+export const priorityAction = priorityStatus
+  ? `${priorityStatus.label} needs attention — ${priorityStatus.detail}.`
+  : "All mission-critical metrics are on track.";
+
 export const recentActivity: ActivityItem[] = [
   {
     id: "starbucks",

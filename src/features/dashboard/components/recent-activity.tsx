@@ -39,7 +39,13 @@ export function RecentActivity({ activity }: { activity: ActivityItem[] }) {
               </div>
 
               <div className="shrink-0 text-right">
-                <p className="text-sm font-medium text-[var(--danger)]">-${Math.abs(item.amount).toFixed(2)}</p>
+                <p className="text-sm font-medium text-[var(--foreground-secondary)]">
+                  -$
+                  {Math.abs(item.amount).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
                 <p className="mt-1 text-xs text-[var(--foreground-muted)]">{item.category}</p>
               </div>
             </li>

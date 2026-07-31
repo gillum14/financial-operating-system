@@ -4,11 +4,11 @@ import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 import type { UpcomingObjective } from "@/features/dashboard/types";
 
-const OBJECTIVE_PRESENTATION: Record<string, { icon: LucideIcon; tone: string }> = {
-  mortgage: { icon: Home, tone: "var(--danger)" },
-  "car-insurance": { icon: ShieldCheck, tone: "var(--warning)" },
-  electric: { icon: Zap, tone: "var(--warning)" },
-  salary: { icon: Landmark, tone: "var(--primary)" },
+const OBJECTIVE_ICON: Record<string, LucideIcon> = {
+  mortgage: Home,
+  "car-insurance": ShieldCheck,
+  electric: Zap,
+  salary: Landmark,
 };
 
 function formatAmount(amount: number) {
@@ -31,9 +31,8 @@ export function UpcomingObjectives({ objectives }: { objectives: UpcomingObjecti
 
       <ul className="space-y-4">
         {objectives.map((objective) => {
-          const presentation = OBJECTIVE_PRESENTATION[objective.id];
-          const Icon = presentation?.icon ?? Landmark;
-          const tone = presentation?.tone ?? "var(--foreground-muted)";
+          const Icon = OBJECTIVE_ICON[objective.id] ?? Landmark;
+          const tone = objective.amount < 0 ? "var(--warning)" : "var(--success)";
 
           return (
             <li key={objective.id} className="flex items-center gap-3">
@@ -51,10 +50,7 @@ export function UpcomingObjectives({ objectives }: { objectives: UpcomingObjecti
 
               <div className="shrink-0 text-right">
                 <p className="text-xs text-[var(--foreground-muted)]">{objective.dueDate}</p>
-                <p
-                  className="mt-1 text-sm font-medium"
-                  style={{ color: objective.amount < 0 ? "var(--warning)" : "var(--success)" }}
-                >
+                <p className="mt-1 text-sm font-medium" style={{ color: tone }}>
                   {formatAmount(objective.amount)}
                 </p>
               </div>

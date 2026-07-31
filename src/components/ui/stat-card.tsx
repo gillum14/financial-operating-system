@@ -8,24 +8,25 @@ type StatCardProps = {
   value: string;
   icon: LucideIcon;
   children?: ReactNode;
+  className?: string;
 };
 
-export default function StatCard({ label, value, icon: Icon, children }: StatCardProps) {
+export default function StatCard({ label, value, icon: Icon, children, className = "" }: StatCardProps) {
   return (
-    <Card>
+    <Card className={className}>
       <div className="flex items-start justify-between">
         <p className="text-xs font-semibold tracking-[0.12em] text-[var(--foreground-muted)] uppercase">
           {label}
         </p>
 
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--foreground-secondary)]">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--foreground-secondary)]">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
       </div>
 
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-[var(--foreground)]">{value}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-[var(--foreground)]">{value}</p>
 
-      {children && <div className="mt-3">{children}</div>}
+      {children && <div className="mt-2">{children}</div>}
     </Card>
   );
 }

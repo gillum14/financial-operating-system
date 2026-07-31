@@ -69,21 +69,14 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function OwlMark() {
+function AthenaMark() {
   return (
-    <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0 text-[var(--primary)]" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0" aria-hidden="true">
+      <rect width="32" height="32" rx="9" fill="var(--primary)" />
       <path
-        d="M16 3c-6.075 0-11 4.925-11 11 0 5.02 2.5 8.146 4.5 10.5.53.62 1.4.73 2.06.27L16 21.5l4.44 3.27c.66.46 1.53.35 2.06-.27C24.5 22.146 27 19.02 27 14c0-6.075-4.925-11-11-11Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
+        d="M14.5 7 L16 7 L13 25 L8 25 Z M16 7 L17.5 7 L24 25 L19 25 Z M10 17 H22 V20 H10 Z"
+        fill="white"
       />
-      <circle cx="11.5" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="20.5" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="11.5" cy="14" r="0.6" fill="currentColor" />
-      <circle cx="20.5" cy="14" r="0.6" fill="currentColor" />
-      <path d="M16 15.5 14.6 18h2.8L16 15.5Z" fill="currentColor" />
-      <path d="M9 9.5 12 7M23 9.5 20 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -98,7 +91,7 @@ export function AppSidebar({ user }: { user: CurrentUser }) {
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
       <div className="flex items-center gap-3 border-b border-[var(--border)] px-6 py-5">
-        <OwlMark />
+        <AthenaMark />
         <div>
           <p className="text-lg leading-tight font-semibold tracking-[0.08em] text-[var(--foreground)]">
             ATHENA
@@ -125,7 +118,7 @@ export function AppSidebar({ user }: { user: CurrentUser }) {
                     <span
                       key={item.href}
                       aria-disabled="true"
-                      className="flex cursor-not-allowed items-center gap-3 rounded-[calc(var(--radius)-6px)] px-3 py-2 text-sm font-medium text-[var(--foreground-muted)] opacity-50"
+                      className="flex cursor-not-allowed items-center gap-3 rounded-[calc(var(--radius)-6px)] px-3 py-2 text-sm font-medium text-[var(--foreground-secondary)] opacity-70"
                     >
                       <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                       <span className="flex-1">{item.label}</span>
@@ -146,14 +139,17 @@ export function AppSidebar({ user }: { user: CurrentUser }) {
                     href={item.href}
                     className={`relative flex items-center gap-3 rounded-[calc(var(--radius)-6px)] px-3 py-2 text-sm font-medium transition-colors ${
                       isActive
-                        ? "bg-[var(--surface-hover)] text-[var(--foreground)]"
+                        ? "bg-[var(--primary)]/10 text-[var(--foreground)]"
                         : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
                     }`}
                   >
                     {isActive && (
                       <span className="absolute top-1 bottom-1 -left-4 w-0.5 rounded-full bg-[var(--primary)]" />
                     )}
-                    <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    <Icon
+                      className={`h-4 w-4 shrink-0 ${isActive ? "text-[var(--primary)]" : ""}`}
+                      strokeWidth={1.75}
+                    />
                     <span className="flex-1">{item.label}</span>
                     {item.badge !== undefined && (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[11px] font-semibold text-white">
