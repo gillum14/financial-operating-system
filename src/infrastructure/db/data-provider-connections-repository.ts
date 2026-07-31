@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { dataProviderConnections } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { DataProviderConnectionRepository } from "@/domains/data-provider-connections/repository";
 import type {
   DataProviderConnection,
@@ -57,7 +58,7 @@ export class DrizzleDataProviderConnectionRepository implements DataProviderConn
       .returning();
 
     if (!row) {
-      throw new Error(`Data provider connection ${id} not found for owner ${ownerId}`);
+      throw new NotFoundError(`Data provider connection ${id} not found for owner ${ownerId}`);
     }
 
     return row;

@@ -2,6 +2,7 @@ import { and, eq, gte, isNull, lte, type SQLWrapper } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { transactions } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { TransactionRepository } from "@/domains/transactions/repository";
 import type {
   Transaction,
@@ -60,7 +61,7 @@ export class DrizzleTransactionRepository implements TransactionRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`Transaction ${id} not found for owner ${ownerId}`);
+      throw new NotFoundError(`Transaction ${id} not found for owner ${ownerId}`);
     }
 
     return row;

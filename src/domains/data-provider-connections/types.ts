@@ -1,9 +1,11 @@
-import type {
-  DataProviderConnection,
-  DataProviderConnectionStatus,
-  NewDataProviderConnection,
+import {
+  DATA_PROVIDER_CONNECTION_STATUSES,
+  type DataProviderConnection,
+  type DataProviderConnectionStatus,
+  type NewDataProviderConnection,
 } from "@/db/schema/data-provider-connections";
 
+export { DATA_PROVIDER_CONNECTION_STATUSES };
 export type { DataProviderConnection, DataProviderConnectionStatus };
 
 export type DataProviderConnectionCreateInput = Omit<

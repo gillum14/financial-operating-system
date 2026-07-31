@@ -4,23 +4,27 @@ import { institutions } from "./institutions";
 import { timestamps } from "./shared-columns";
 import { users } from "./users";
 
-export type AccountType =
-  | "checking"
-  | "savings"
-  | "credit-card"
-  | "mortgage"
-  | "personal-loan"
-  | "vehicle-loan"
-  | "cash"
-  | "investment"
-  | "retirement"
-  | "property"
-  | "other-asset"
-  | "other-liability";
+export const ACCOUNT_TYPES = [
+  "checking",
+  "savings",
+  "credit-card",
+  "mortgage",
+  "personal-loan",
+  "vehicle-loan",
+  "cash",
+  "investment",
+  "retirement",
+  "property",
+  "other-asset",
+  "other-liability",
+] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
-export type AccountStatus = "active" | "archived";
+export const ACCOUNT_STATUSES = ["active", "archived"] as const;
+export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
-export type AccountBalanceSource = "manual" | "computed";
+export const ACCOUNT_BALANCE_SOURCES = ["manual", "computed"] as const;
+export type AccountBalanceSource = (typeof ACCOUNT_BALANCE_SOURCES)[number];
 
 export const accounts = pgTable(
   "accounts",

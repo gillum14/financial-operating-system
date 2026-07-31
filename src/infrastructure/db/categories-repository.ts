@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { categories } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { CategoryRepository } from "@/domains/categories/repository";
 import type { Category, CategoryCreateInput, CategoryUpdateInput } from "@/domains/categories/types";
 
@@ -50,7 +51,7 @@ export class DrizzleCategoryRepository implements CategoryRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`Category ${id} not found for owner ${ownerId}`);
+      throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
     }
 
     return row;

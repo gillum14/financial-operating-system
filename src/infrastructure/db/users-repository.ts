@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { users } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { UserRepository } from "@/domains/users/repository";
 import type { User, UserCreateInput, UserUpdateInput } from "@/domains/users/types";
 
@@ -39,7 +40,7 @@ export class DrizzleUserRepository implements UserRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`User ${id} not found`);
+      throw new NotFoundError(`User ${id} not found`);
     }
 
     return row;

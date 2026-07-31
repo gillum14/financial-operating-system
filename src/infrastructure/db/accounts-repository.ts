@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { accounts } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 import type { AccountRepository } from "@/domains/accounts/repository";
 import type { Account, AccountCreateInput, AccountUpdateInput } from "@/domains/accounts/types";
 
@@ -37,7 +38,7 @@ export class DrizzleAccountRepository implements AccountRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`Account ${id} not found for owner ${ownerId}`);
+      throw new NotFoundError(`Account ${id} not found for owner ${ownerId}`);
     }
 
     return row;
@@ -51,7 +52,7 @@ export class DrizzleAccountRepository implements AccountRepository {
       .returning();
 
     if (!row) {
-      throw new Error(`Account ${id} not found for owner ${ownerId}`);
+      throw new NotFoundError(`Account ${id} not found for owner ${ownerId}`);
     }
 
     return row;
