@@ -2,9 +2,9 @@ import { Banknote, PieChart, Target, TrendingUp } from "lucide-react";
 
 import StatCard, { StatCaption } from "@/components/ui/stat-card";
 import ProgressBar from "@/components/ui/progress-bar";
-import { currentUser } from "@/lib/session";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
-import { resolveDevelopmentOwnerId } from "@/composition/development-owner";
+import { getUserProfile } from "@/composition/user-profile";
+import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import {
   budgetProgress,
   confidenceScore,
@@ -30,7 +30,7 @@ import { RecentActivity } from "@/features/dashboard/components/recent-activity"
 import { DashboardFooter } from "@/features/dashboard/components/dashboard-footer";
 
 // This page renders live, per-owner financial data resolved at request
-// time (see resolveDevelopmentOwnerId / getDashboardSnapshot below) — it
+// time (see requireAuthenticatedUser / getDashboardSnapshot below) — it
 // must never be statically prerendered or cached across owners.
 export const dynamic = "force-dynamic";
 
@@ -48,19 +48,26 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 
 export default async function DashboardPage() {
   const greeting = getGreeting(new Date().getHours());
-  const firstName = currentUser.name.split(" ")[0];
+
+  // Authoritative identity for this request — the (authenticated) layout
+  // already redirects unauthenticated requests, but ownerId still comes
+  // from here directly rather than any prop, since it must never be
+  // trusted from anything client-controlled.
+  const authUser = await requireAuthenticatedUser();
+  const profile = await getUserProfile(authUser.id);
+  const firstName = (profile?.displayName ?? authUser.email).split(" ")[0];
 
   // Sections still sourced from mock data (Confidence Engine, Mission
   // Engine, budget domain, and objectives/recommendations aren't
   // implemented yet — out of scope for this slice) are wired below
   // unchanged; everything else comes from a real DashboardSnapshot.
-  const ownerId = resolveDevelopmentOwnerId();
+  //
   // Recent Activity is a compact widget, not the full ledger — "View all"
   // is the entry point to the complete history. Uses DashboardService's
   // existing recentActivityLimit option rather than slicing anywhere else,
   // so callers who need the full recent-transaction set (there are none
   // today) still get it by passing a larger limit or omitting it.
-  const snapshot = await getDashboardSnapshot(ownerId, { recentActivityLimit: 5 });
+  const snapshot = await getDashboardSnapshot(authUser.id, { recentActivityLimit: 5 });
 
   const asOfLabel = `As of ${new Date().toLocaleString("en-US", {
     month: "short",

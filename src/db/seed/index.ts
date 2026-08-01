@@ -1,20 +1,28 @@
 import { db, queryClient } from "../client";
-import { accounts, categories, dataProviderConnections, institutions, transactions, users } from "../schema";
-import {
-  devAccounts,
-  devChildCategories,
-  devDataProviderConnections,
-  devInstitutions,
-  devParentCategories,
-  devTransactions,
-  devUsers,
-} from "./data";
+import { accounts, categories, dataProviderConnections, institutions, transactions } from "../schema";
+import { buildDevData } from "./data";
 
 // Idempotent: every seed row has a fixed id, so re-running this script only
-// ever inserts rows that don't already exist.
+// ever inserts rows that don't already exist. public.users is deliberately
+// never inserted into here — that row is created exclusively by the
+// handle_new_user trigger when SEED_OWNER_ID actually signs up.
 async function seed() {
-  await db.insert(users).values(devUsers).onConflictDoNothing();
-  console.log(`Seeded ${devUsers.length} user(s)`);
+  const ownerId = process.env.SEED_OWNER_ID;
+  if (!ownerId) {
+    throw new Error(
+      "SEED_OWNER_ID is required. Sign up a real user through the app locally (npm run dev, " +
+        "visit /signup), then set SEED_OWNER_ID in your .env to that user's id — see README.md.",
+    );
+  }
+
+  const {
+    devInstitutions,
+    devParentCategories,
+    devChildCategories,
+    devAccounts,
+    devTransactions,
+    devDataProviderConnections,
+  } = buildDevData(ownerId);
 
   await db.insert(institutions).values(devInstitutions).onConflictDoNothing();
   console.log(`Seeded ${devInstitutions.length} institution(s)`);

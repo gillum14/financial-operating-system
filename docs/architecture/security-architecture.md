@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 29, 2026
+**Last Updated:** August 1, 2026
 
 ---
 
@@ -534,6 +534,14 @@ Athena application records shall reference authenticated user identifiers withou
 
 The application must not store plaintext passwords.
 
+### Implementation Note (Current State)
+
+Supabase Auth (email/password only — no social login or magic links yet) is implemented via `@supabase/ssr`, with three deliberately separate clients: `src/lib/supabase/client.ts` (browser, anon key only), `src/lib/supabase/server.ts` (Server Components/Actions/Route Handlers, cookie-based session), and `src/lib/supabase/middleware.ts` (session-refresh only, used by `src/proxy.ts`). No service-role client exists in the codebase — nothing in the current feature set needs one, and `src/architecture-boundaries.test.ts` asserts one doesn't get added casually.
+
+**Canonical identity model**: one UUID flows through the whole system — `auth.users.id = public.users.id = accounts.owner_id = categories.owner_id = transactions.owner_id = data_provider_connections.owner_id`. `public.users.id` has a foreign key to `auth.users.id` (`ON DELETE RESTRICT` — see Data Retention and Deletion below) and no longer generates its own id. Authorization never uses email — see Ownership Enforcement below.
+
+The `public.users` profile row is created by a database trigger (`handle_new_user`, `src/db/migrations/0002_handle_new_user_trigger.sql`) when `auth.users` gains a row — never by application code — so an auth user can never exist without a matching profile (the insert is atomic with signup).
+
 ---
 
 ## Authentication
@@ -556,6 +564,12 @@ Authentication controls should include:
 
 Authentication errors must not reveal whether sensitive accounts or records exist.
 
+### Implementation Note (Current State)
+
+`requireAuthenticatedUser()` / `getAuthenticatedUser()` (`src/lib/auth/authenticated-user.ts`) are the single trusted contract — every protected page calls one of these rather than trusting a client-passed identity. Both call Supabase's `auth.getUser()`, which revalidates the JWT against the Auth server; `auth.getSession()` (which only reads the local cookie without verification) is never used as authorization evidence anywhere in the codebase. `getAuthenticatedUser()` is wrapped in React's `cache()` so multiple calls within one request (layout + page) only hit Supabase once.
+
+Login, signup, password recovery, and confirmation-resend (`src/app/(auth)/actions.ts`) all return one generic, enumeration-safe message per failure class — wrong password, unknown email, and unconfirmed email are indistinguishable in the login response; signup returns the same "check your email" message whether the address was new or already registered; password-recovery requests always return the same response regardless of whether the account exists. Raw Supabase/provider error text is never rendered to the user or logged — only `.status`/`.code`/`.message` from the `AuthError`, which never carries credentials. HTTP 429 responses are mapped to a single generic "too many attempts" message everywhere they can occur (login, signup, recovery, resend).
+
 ---
 
 ## Session Security
@@ -576,6 +590,12 @@ Session security should include:
 Sensitive operations may require recent authentication.
 
 Logout should invalidate or revoke the active session where supported rather than only clearing visible client state.
+
+### Implementation Note (Current State)
+
+Session cookies are managed entirely by `@supabase/ssr`'s cookie-based SSR handling (HttpOnly, Secure, SameSite as set by that library) — application code never reads or writes the session cookie directly. `src/proxy.ts` refreshes the session on every matched request via `updateSession()` so tokens don't silently expire mid-session. Logout (`src/lib/auth/actions.ts`) calls `supabase.auth.signOut()`, which revokes the session server-side, not just clearing client state, then redirects to `/login`.
+
+Route protection is layered: `src/proxy.ts` redirects unauthenticated requests as defense in depth, but the authoritative check is `requireAuthenticatedUser()` called server-side in `src/app/(authenticated)/layout.tsx` (and again in the dashboard page, deduplicated via `cache()`) — client components never make authorization decisions. A `redirectTo` value is validated against a small internal allowlist (`src/lib/auth/redirect.ts`) before ever being used in a redirect, preventing open-redirect abuse of the post-login destination.
 
 ---
 
@@ -626,6 +646,10 @@ A record identifier alone must never prove authorization.
 
 Cross-owner references must be rejected.
 
+### Implementation Note (Current State)
+
+`ownerId` for every protected request comes exclusively from `requireAuthenticatedUser()`'s verified identity — never from a route param, query string, form field, header, or client-supplied prop. `src/architecture-boundaries.test.ts` asserts the dashboard page derives it this way. No authorization decision anywhere uses email; email is cached display/contact data only (see Identity Architecture above), enforced by convention and covered by a repository-level test (`src/infrastructure/db/users-repository.test.ts`).
+
 ---
 
 ## Row Level Security
@@ -665,6 +689,10 @@ RLS policies must address:
 - RLS policies must be tested automatically.
 
 RLS does not replace application authorization.
+
+### Implementation Note (Current State)
+
+**Not yet implemented — remains an open requirement**, explicitly out of scope for the authentication foundation slice that established the identity model above. Ownership is currently enforced only at the application layer (owner-scoped repository methods) and via foreign keys, not by Postgres RLS policies. This is a real gap until RLS lands: a bug in application-layer scoping would not be caught by a second, independent database-level check. Full table RLS policies are the next security-relevant slice this dependency should motivate.
 
 ---
 
@@ -1187,6 +1215,12 @@ Controls may include:
 
 Limits should protect the platform without disrupting normal use.
 
+### Implementation Note (Current State)
+
+Authentication rate limiting (login, signup, password recovery, confirmation resend) is enforced by Supabase Auth's own built-in limits — Athena does not implement a custom or distributed limiter (no Redis) for this slice. The application layer's job is safe UX around Supabase's HTTP 429 responses: `src/app/(auth)/actions.ts` maps every 429 to one generic "too many attempts" message, and the signup-confirmation screen has a client-side resend cooldown (`src/components/auth/resend-confirmation-button.tsx`, 30s) that's UX-only — Supabase's own limit is the real enforcement.
+
+The following require manual review in the Supabase dashboard and are not configurable from application code — see `README.md`'s Supabase Auth configuration checklist for the full list: Auth rate-limit thresholds, email confirmation being enabled, the redirect URL allowlist, the production Site URL, CAPTCHA/Turnstile (before public beta — not yet added), breached-password protection (plan-dependent), and MFA readiness for later sensitive-action work.
+
 ---
 
 ## Audit Logging
@@ -1457,6 +1491,10 @@ Deletion workflows must:
 - Follow documented retention policy
 
 Authoritative financial records should not be hard-deleted through routine workflows.
+
+### Implementation Note (Current State)
+
+`public.users.id` has `ON DELETE RESTRICT` (not `CASCADE`) against `auth.users.id` (`src/db/migrations/0001_wooden_shen.sql`): removing an auth user is blocked by Postgres at the database level while their profile and financial records still exist, rather than silently cascading the deletion through accounts/categories/transactions. There is no account-deletion workflow yet — that remains explicit future work, and this constraint is exactly what a future controlled deletion workflow will need to work around deliberately (e.g., an explicit archival/anonymization step before the auth user can be removed), rather than something that can be bypassed accidentally.
 
 ---
 
@@ -1780,3 +1818,4 @@ Architecturally significant decisions shall be documented through ADRs.
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-07-29 | Caitlin Gillum | Defined Athena's security architecture, threat model, trust boundaries, identity and authorization controls, ownership enforcement, Row Level Security expectations, file and import protections, secrets management, infrastructure security, incident response, vulnerability management, and security testing strategy. |
+| 1.1.0 | 2026-08-01 | Caitlin Gillum | Added implementation notes documenting the Supabase Auth foundation: the canonical identity model (`auth.users.id = public.users.id = owner_id`), the `requireAuthenticatedUser()` trust boundary, the `handle_new_user` profile trigger, server/client Supabase client separation, layered route protection, rate-limit and enumeration-safe error handling, the `ON DELETE RESTRICT` retention posture, and that Row Level Security remains an explicit open requirement. |

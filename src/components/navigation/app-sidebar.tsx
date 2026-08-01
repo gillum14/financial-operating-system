@@ -7,11 +7,11 @@ import {
   Activity,
   Bell,
   Calendar,
-  ChevronsUpDown,
   CreditCard,
   FileText,
   Folder,
   LayoutDashboard,
+  LogOut,
   Plug,
   Repeat,
   Settings,
@@ -22,7 +22,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { CurrentUser } from "@/lib/session";
+import { logout } from "@/lib/auth/actions";
+
+export type SidebarUser = {
+  displayName: string;
+  email: string;
+  initials: string;
+};
 
 type NavItem = {
   label: string;
@@ -87,7 +93,7 @@ function isRouteActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ user }: { user: CurrentUser }) {
+export function AppSidebar({ user }: { user: SidebarUser }) {
   const pathname = usePathname();
 
   return (
@@ -166,24 +172,24 @@ export function AppSidebar({ user }: { user: CurrentUser }) {
         ))}
       </nav>
 
-      <button
-        type="button"
-        className="flex items-center gap-3 border-t border-[var(--border)] px-6 py-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/15 text-xs font-semibold text-[var(--primary)]">
-          {user.initials}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-[var(--foreground)]">
-            {user.name}
+      <form action={logout}>
+        <button
+          type="submit"
+          title="Log out"
+          className="flex w-full items-center gap-3 border-t border-[var(--border)] px-6 py-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/15 text-xs font-semibold text-[var(--primary)]">
+            {user.initials}
           </span>
-          <span className="block truncate text-xs text-[var(--foreground-muted)]">{user.role}</span>
-        </span>
-        <ChevronsUpDown
-          className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]"
-          strokeWidth={1.75}
-        />
-      </button>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-[var(--foreground)]">
+              {user.displayName}
+            </span>
+            <span className="block truncate text-xs text-[var(--foreground-muted)]">{user.email}</span>
+          </span>
+          <LogOut className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.75} />
+        </button>
+      </form>
     </aside>
   );
 }

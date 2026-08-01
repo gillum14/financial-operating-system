@@ -46,14 +46,16 @@ jobs:
         run: npm test
 
       - name: Build
-        # next build evaluates src/lib/env.ts at module-load time (imported
-        # transitively via the dashboard's composition root), which requires
-        # a syntactically valid DATABASE_URL even though this route is
-        # force-dynamic and is never actually rendered during the build
-        # itself. These are inert placeholders with no reachable database
-        # behind them, not a secret and not live Supabase credentials —
-        # needed only to satisfy that format check.
+        # next build evaluates src/lib/env.ts and src/lib/supabase-env.ts at
+        # module-load time (imported transitively via the dashboard's
+        # composition root and src/proxy.ts, both bundled into every build),
+        # which requires syntactically valid values even though the
+        # force-dynamic dashboard route is never actually rendered during
+        # the build itself. These are inert placeholders with no reachable
+        # database or Supabase project behind them — not secrets, not live
+        # credentials — needed only to satisfy format checks.
         run: npm run build
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-          DEVELOPMENT_OWNER_ID: 00000000-0000-0000-0000-000000000001
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
