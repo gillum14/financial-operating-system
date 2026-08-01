@@ -1,5 +1,11 @@
 # financial-operating-system
+
 A secure personal finance platform for transaction management, budgeting, debt payoff, net worth tracking, and financial automation.
+
+## Core Documentation
+
+- [Athena Canon](CANON.md) — the authoritative source for Athena's governing product, engineering, security, and documentation principles.
+- [Engineering Handbook](docs/README.md) — the entry point for architecture, product, implementation, standards, and supporting documentation.
 
 ## Local development setup
 
