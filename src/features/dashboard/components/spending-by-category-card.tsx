@@ -26,15 +26,19 @@ export function SpendingByCategoryCard({
       </CardHeader>
 
       {categories.length === 0 ? (
-        <p className="text-sm text-[var(--foreground-muted)]">No spending recorded this period.</p>
+        <>
+          <p className="text-sm text-[var(--foreground-muted)]">No spending recorded this period.</p>
+          <p className="mt-4 text-xs text-[var(--foreground-muted)]">{updatedLabel}</p>
+        </>
       ) : (
-        <div className="flex min-w-0 items-center gap-4">
-          <SpendingByCategoryChart data={categories} total={total} />
+        <div className="flex min-w-0 flex-col items-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center gap-4">
+            <SpendingByCategoryChart data={categories} total={total} />
+            <p className="text-center text-xs text-[var(--foreground-muted)]">{updatedLabel}</p>
+          </div>
           <CategoryLegendTable data={categories} />
         </div>
       )}
-
-      <p className="mt-4 text-xs text-[var(--foreground-muted)]">{updatedLabel}</p>
     </Card>
   );
 }

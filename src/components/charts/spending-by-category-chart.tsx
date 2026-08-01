@@ -24,7 +24,8 @@ function CustomTooltip({ active, payload }: TooltipContentProps) {
         {category.category}
       </p>
       <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">
-        ${category.amount.toLocaleString()} · {category.percent}%
+        ${category.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·{" "}
+        {category.percent}%
       </p>
     </div>
   );
@@ -38,7 +39,7 @@ export function SpendingByCategoryChart({
   total: number;
 }) {
   return (
-    <div className="relative h-32 w-32 shrink-0">
+    <div className="relative h-[8.75rem] w-[8.75rem] shrink-0">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -57,7 +58,7 @@ export function SpendingByCategoryChart({
           <Tooltip
             content={CustomTooltip}
             allowEscapeViewBox={{ x: true, y: true }}
-            position={{ x: 4, y: 118 }}
+            position={{ x: 4, y: 129 }}
             isAnimationActive={false}
             wrapperStyle={{ zIndex: 20 }}
           />
@@ -80,16 +81,7 @@ export function CategoryLegendTable({ data }: { data: CategorySpend[] }) {
       {data.map((entry) => (
         <li key={entry.category} className="flex items-center gap-2 text-sm">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
-          <span
-            title={entry.category}
-            className="min-w-0 flex-1 truncate text-[var(--foreground-secondary)]"
-          >
-            {entry.category}
-          </span>
-          <span className="shrink-0 font-medium text-[var(--foreground)]">
-            ${entry.amount.toLocaleString()}
-          </span>
-          <span className="w-8 shrink-0 text-right text-[var(--foreground-muted)]">{entry.percent}%</span>
+          <span className="min-w-0 flex-1 font-medium text-[var(--foreground-secondary)]">{entry.category}</span>
         </li>
       ))}
     </ul>

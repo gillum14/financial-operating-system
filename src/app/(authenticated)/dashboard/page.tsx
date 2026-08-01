@@ -55,7 +55,12 @@ export default async function DashboardPage() {
   // implemented yet — out of scope for this slice) are wired below
   // unchanged; everything else comes from a real DashboardSnapshot.
   const ownerId = resolveDevelopmentOwnerId();
-  const snapshot = await getDashboardSnapshot(ownerId);
+  // Recent Activity is a compact widget, not the full ledger — "View all"
+  // is the entry point to the complete history. Uses DashboardService's
+  // existing recentActivityLimit option rather than slicing anywhere else,
+  // so callers who need the full recent-transaction set (there are none
+  // today) still get it by passing a larger limit or omitting it.
+  const snapshot = await getDashboardSnapshot(ownerId, { recentActivityLimit: 5 });
 
   const asOfLabel = `As of ${new Date().toLocaleString("en-US", {
     month: "short",
