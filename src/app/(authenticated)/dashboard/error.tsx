@@ -4,12 +4,12 @@ import { useEffect } from "react";
 
 import Card from "@/components/ui/card";
 
-// Catches errors thrown while resolving the development owner or loading
-// the dashboard snapshot (e.g. database unavailable, misconfigured
-// DEVELOPMENT_OWNER_ID). Deliberately never renders `error.message` —
-// Next.js redacts server-error messages to a generic string in production
-// anyway, but this stays safe regardless of environment or what the
-// underlying error happens to say.
+// Catches errors thrown while loading the dashboard snapshot or the user's
+// profile (e.g. database unavailable, missing public.users profile).
+// Deliberately never renders `error.message` — Next.js redacts
+// server-error messages to a generic string in production anyway, but
+// this stays safe regardless of environment or what the underlying error
+// happens to say.
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Dashboard failed to load:", error);

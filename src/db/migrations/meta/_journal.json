@@ -8,6 +8,20 @@
       "when": 1785526712579,
       "tag": "0000_round_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785612216461,
+      "tag": "0001_wooden_shen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785612399944,
+      "tag": "0002_handle_new_user_trigger",
+      "breakpoints": true
     }
   ]
 }

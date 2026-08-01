@@ -45,7 +45,7 @@ export class FakeUserRepository implements UserRepository {
   async create(input: UserCreateInput): Promise<User> {
     const now = new Date();
     const row: User = {
-      id: randomUUID(),
+      id: input.id,
       email: input.email,
       displayName: input.displayName,
       createdAt: now,

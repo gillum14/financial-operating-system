@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -8,8 +6,8 @@ import { institutions } from "@/db/schema";
 
 import { DrizzleAccountRepository } from "./accounts-repository";
 import { DrizzleInstitutionRepository } from "./institutions-repository";
+import { createTestAuthUser } from "./test-support/create-test-auth-user";
 import { withRollback } from "./test-support/with-rollback";
-import { DrizzleUserRepository } from "./users-repository";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
@@ -29,11 +27,13 @@ describe.skipIf(!hasDatabase)("DrizzleAccountRepository (integration)", () => {
 
   it("does not return another owner's accounts", async () => {
     await withRollback(db, async (tx) => {
-      const users = new DrizzleUserRepository(tx);
       const accounts = new DrizzleAccountRepository(tx);
 
-      const ownerA = await users.create({ email: `a-${randomUUID()}@example.com`, displayName: "Owner A" });
-      const ownerB = await users.create({ email: `b-${randomUUID()}@example.com`, displayName: "Owner B" });
+      // createTestAuthUser() alone is enough: the handle_new_user trigger
+      // (src/db/migrations/0002_handle_new_user_trigger.sql) creates the
+      // matching public.users profile as soon as the auth.users row exists.
+      const ownerA = await createTestAuthUser(tx);
+      const ownerB = await createTestAuthUser(tx);
 
       await accounts.create({ ownerId: ownerA.id, name: "A's Checking", accountType: "checking" });
       await accounts.create({ ownerId: ownerB.id, name: "B's Checking", accountType: "checking" });
@@ -47,11 +47,10 @@ describe.skipIf(!hasDatabase)("DrizzleAccountRepository (integration)", () => {
 
   it("sets institutionId to null when the referenced institution is hard-deleted", async () => {
     await withRollback(db, async (tx) => {
-      const users = new DrizzleUserRepository(tx);
       const institutionRepository = new DrizzleInstitutionRepository(tx);
       const accounts = new DrizzleAccountRepository(tx);
 
-      const owner = await users.create({ email: `owner-${randomUUID()}@example.com`, displayName: "Owner" });
+      const owner = await createTestAuthUser(tx);
       const institution = await institutionRepository.create({ name: "Test Bank" });
       const account = await accounts.create({
         ownerId: owner.id,

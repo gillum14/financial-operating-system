@@ -12,7 +12,7 @@ export interface DashboardSnapshotOptions {
 
 // Server-only query function: orchestrates DashboardService + the adapter
 // and returns presentation-ready data. No JSX, no try/catch — errors
-// (connection failures, thrown by resolveDevelopmentOwnerId(), etc.)
+// (connection failures, thrown by requireAuthenticatedUser(), etc.)
 // propagate as-is so the caller (or a Next.js error boundary) decides how
 // to present them.
 export async function getDashboardSnapshot(

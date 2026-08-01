@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.1.0
+**Document Version:** 1.2.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 31, 2026
+**Last Updated:** August 1, 2026
 
 ---
 
@@ -510,6 +510,10 @@ sequenceDiagram
 ```
 
 Authentication establishes identity but does not establish access to a specific resource.
+
+### Implementation Note (Current State)
+
+This flow is now implemented for email/password (no social login or magic links). "Server verifies session" is `requireAuthenticatedUser()` (`src/lib/auth/authenticated-user.ts`), which calls Supabase's `auth.getUser()` — revalidated against the Auth server, not a locally-trusted cookie read. `src/proxy.ts` additionally refreshes the session cookie and redirects unauthenticated requests to `/login` as defense in depth; the layout/page-level `requireAuthenticatedUser()` call remains the authoritative check. The dev-owner scaffolding this note previously described (`resolveDevelopmentOwnerId()`) has been fully removed — no authenticated route depends on it anymore.
 
 ---
 
@@ -1109,10 +1113,10 @@ Dashboard configuration controls presentation but not authoritative financial st
 
 ### Implementation Note (Current State)
 
-The sequence above is the target flow, once Supabase Auth (see [Authentication Flow](#authentication-flow)) is implemented. As of the current implementation:
+The sequence above is now implemented as described — "Verify session" is `requireAuthenticatedUser()`, backed by real Supabase Auth (see [Authentication Flow](#authentication-flow)). As of the current implementation:
 
 - The read path is `PostgreSQL → Drizzle repositories → DashboardService → dashboard data adapter → dashboard page`, composed in `src/composition/dashboard-composition.ts` and `src/composition/dashboard-query.ts` — the only files outside `src/infrastructure` permitted to import it. Presentation components never import infrastructure or the database directly.
-- "Verify session" is temporarily replaced by `resolveDevelopmentOwnerId()` (`src/composition/development-owner.ts`), which reads a fixed `DEVELOPMENT_OWNER_ID` environment variable instead of an authenticated session. It validates the value as a UUID, refuses to run at all when `NODE_ENV=production`, and throws clearly when unset or malformed. It is isolated in a single file specifically so it has one deletion point when Supabase Auth replaces it — nothing else in the app reads `DEVELOPMENT_OWNER_ID` directly, and the browser never supplies an owner id.
+- `ownerId` comes from `requireAuthenticatedUser()`'s verified identity, called in `src/app/(authenticated)/layout.tsx` and again in the dashboard page (deduplicated per-request via React's `cache()`). The earlier development-only `resolveDevelopmentOwnerId()` / `DEVELOPMENT_OWNER_ID` scaffolding this note used to describe has been fully removed now that real authentication exists — no authenticated route depends on it, and nothing in the codebase references it anymore.
 - Live data currently backs: the Net Worth, Monthly Cash Flow, and Investments stat tiles; the Financial Overview chart and period summary; Spending by Category; Accounts Overview (using the Slice 8 account presentation mapping, so all twelve schema account types display correctly rather than being collapsed into the legacy four-category UI type); and Recent Activity.
 - Budget Status, Confidence Score, Mission Progress/Status, and Upcoming Objectives remain intentionally mocked — their backing domains (budgets, the Confidence Engine, the Mission Engine, recommendations) are not implemented yet. No deltas, confidence scores, missions, or objectives are fabricated from real data.
 - The dashboard route is `force-dynamic` and renders errors through a route-level error boundary that never surfaces database or connection detail to the client.
@@ -1928,3 +1932,4 @@ Architecturally significant decisions shall be documented through ADRs.
 |---|---|---|---|
 | 1.0.0 | 2026-07-29 | Caitlin Gillum | Defined Athena's end-to-end data flows, including authentication, authorization, validation, manual transactions, imports, duplicate detection, classification, review, transfers, budgets, debts, reporting, exports, audit, background jobs, AI assistance, retries, failures, and authoritative state transitions. |
 | 1.1.0 | 2026-07-31 | Caitlin Gillum | Added an implementation note to the Dashboard Flow describing the current interim read path (composition root, `DashboardService`, adapter) and the temporary `DEVELOPMENT_OWNER_ID` scaffolding standing in for Supabase Auth, including which dashboard sections are live versus intentionally mocked. |
+| 1.2.0 | 2026-08-01 | Caitlin Gillum | Updated the Authentication Flow and Dashboard Flow implementation notes now that Supabase Auth is implemented: `requireAuthenticatedUser()` replaces the removed development-owner scaffolding as the verified-session check on every protected route. |

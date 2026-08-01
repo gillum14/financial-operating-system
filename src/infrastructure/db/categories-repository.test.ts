@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -7,8 +5,8 @@ import type { DbClient } from "@/db/client";
 import { categories } from "@/db/schema";
 
 import { DrizzleCategoryRepository } from "./categories-repository";
+import { createTestAuthUser } from "./test-support/create-test-auth-user";
 import { withRollback } from "./test-support/with-rollback";
-import { DrizzleUserRepository } from "./users-repository";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
@@ -28,11 +26,13 @@ describe.skipIf(!hasDatabase)("DrizzleCategoryRepository (integration)", () => {
 
   it("does not return another owner's categories", async () => {
     await withRollback(db, async (tx) => {
-      const users = new DrizzleUserRepository(tx);
       const categoryRepository = new DrizzleCategoryRepository(tx);
 
-      const ownerA = await users.create({ email: `a-${randomUUID()}@example.com`, displayName: "Owner A" });
-      const ownerB = await users.create({ email: `b-${randomUUID()}@example.com`, displayName: "Owner B" });
+      // createTestAuthUser() alone is enough: the handle_new_user trigger
+      // creates the matching public.users profile as soon as the
+      // auth.users row exists.
+      const ownerA = await createTestAuthUser(tx);
+      const ownerB = await createTestAuthUser(tx);
 
       await categoryRepository.create({ ownerId: ownerA.id, name: "Housing" });
       await categoryRepository.create({ ownerId: ownerB.id, name: "Housing" });
@@ -46,10 +46,9 @@ describe.skipIf(!hasDatabase)("DrizzleCategoryRepository (integration)", () => {
   it("prevents hard-deleting a parent category that still has a child (RESTRICT)", async () => {
     await expect(
       db.transaction(async (tx) => {
-        const users = new DrizzleUserRepository(tx);
         const categoryRepository = new DrizzleCategoryRepository(tx);
 
-        const owner = await users.create({ email: `owner-${randomUUID()}@example.com`, displayName: "Owner" });
+        const owner = await createTestAuthUser(tx);
         const parent = await categoryRepository.create({ ownerId: owner.id, name: "Housing" });
         await categoryRepository.create({ ownerId: owner.id, name: "Rent", parentCategoryId: parent.id });
 
