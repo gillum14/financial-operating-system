@@ -129,7 +129,7 @@ describe("toDashboardSnapshot", () => {
     expect(snapshot.recentActivity[0].amount).toBe(-42.5);
   });
 
-  it("computes percent shares and assigns cyclical chart colors for spending by category", () => {
+  it("computes whole-number percent shares for spending by category", () => {
     const raw = makeRawData({
       categoryTotals: [
         { categoryName: "Food & Dining", totalAmount: 300 },
@@ -140,10 +140,54 @@ describe("toDashboardSnapshot", () => {
     const snapshot = toDashboardSnapshot(raw);
 
     expect(snapshot.spendingByCategory).toEqual([
-      { category: "Food & Dining", amount: 300, percent: 75, color: "var(--chart-1)" },
-      { category: "Transportation", amount: 100, percent: 25, color: "var(--chart-2)" },
+      { category: "Food & Dining", amount: 300, percent: 75, color: expect.any(String) },
+      { category: "Transportation", amount: 100, percent: 25, color: expect.any(String) },
     ]);
     expect(snapshot.spendingTotal).toBe(400);
+  });
+
+  it("rounds percent shares that don't divide evenly to whole numbers", () => {
+    const raw = makeRawData({
+      categoryTotals: [
+        { categoryName: "Food & Dining", totalAmount: 137.53 },
+        { categoryName: "Transportation", totalAmount: 95.2 },
+        { categoryName: "Utilities", totalAmount: 40 },
+      ],
+    });
+
+    const snapshot = toDashboardSnapshot(raw);
+
+    for (const entry of snapshot.spendingByCategory) {
+      expect(Number.isInteger(entry.percent)).toBe(true);
+    }
+  });
+
+  it("assigns each category the same color regardless of its sort rank", () => {
+    const first = toDashboardSnapshot(
+      makeRawData({
+        categoryTotals: [
+          { categoryName: "Food & Dining", totalAmount: 300 },
+          { categoryName: "Transportation", totalAmount: 100 },
+        ],
+      }),
+    );
+    // Same two categories, ranking flipped — a rank-based (array-index)
+    // color assignment would swap their colors here; a name-based
+    // assignment keeps each category's color stable.
+    const second = toDashboardSnapshot(
+      makeRawData({
+        categoryTotals: [
+          { categoryName: "Transportation", totalAmount: 300 },
+          { categoryName: "Food & Dining", totalAmount: 100 },
+        ],
+      }),
+    );
+
+    const colorFor = (snapshot: typeof first, category: string) =>
+      snapshot.spendingByCategory.find((entry) => entry.category === category)?.color;
+
+    expect(colorFor(first, "Food & Dining")).toBe(colorFor(second, "Food & Dining"));
+    expect(colorFor(first, "Transportation")).toBe(colorFor(second, "Transportation"));
   });
 
   it("returns zero percent shares when there is no spending", () => {
@@ -170,8 +214,25 @@ describe("toDashboardSnapshot", () => {
 
     const snapshot = toDashboardSnapshot(raw);
 
-    expect(snapshot.netWorth).toEqual({ label: "Net Worth", value: 1000, caption: raw.periodLabel });
-    expect(snapshot.monthlyCashFlow).toEqual({ label: "Monthly Cash Flow", value: 250, caption: raw.periodLabel });
-    expect(snapshot.investments).toEqual({ label: "Investments", value: 5000, caption: raw.periodLabel });
+    const expectedCaption = "Jun 30 – Jul 30, 2026";
+    expect(snapshot.netWorth).toEqual({ label: "Net Worth", value: 1000, caption: expectedCaption });
+    expect(snapshot.monthlyCashFlow).toEqual({ label: "Monthly Cash Flow", value: 250, caption: expectedCaption });
+    expect(snapshot.investments).toEqual({ label: "Investments", value: 5000, caption: expectedCaption });
+  });
+
+  it("formats a raw ISO period label into a human-readable date range", () => {
+    const raw = makeRawData({ periodLabel: "2026-06-30 – 2026-07-30" });
+
+    const snapshot = toDashboardSnapshot(raw);
+
+    expect(snapshot.netWorth.caption).toBe("Jun 30 – Jul 30, 2026");
+  });
+
+  it("includes both years in the period label when the range crosses a year boundary", () => {
+    const raw = makeRawData({ periodLabel: "2025-12-15 – 2026-01-14" });
+
+    const snapshot = toDashboardSnapshot(raw);
+
+    expect(snapshot.netWorth.caption).toBe("Dec 15, 2025 – Jan 14, 2026");
   });
 });

@@ -43,7 +43,7 @@ export function RecentActivity({ activity }: { activity: ActivityItem[] }) {
 
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-medium text-[var(--foreground-secondary)]">
-                    -$
+                    {item.amount < 0 ? "-" : "+"}$
                     {Math.abs(item.amount).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,

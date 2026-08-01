@@ -16,7 +16,12 @@ export function BudgetProgressCard({ progress }: { progress: BudgetProgress }) {
       </CardHeader>
 
       <div className="flex items-center gap-6">
-        <BudgetProgressRing percent={progress.percent} />
+        <div className="flex flex-col items-center">
+          <BudgetProgressRing percent={progress.percent} />
+          <p className="mt-4 text-center text-xs text-[var(--foreground-muted)]">
+            {progress.daysRemaining} days remaining in {progress.periodLabel.split(" ")[0]}
+          </p>
+        </div>
 
         <div className="space-y-4">
           <div>
@@ -41,10 +46,6 @@ export function BudgetProgressCard({ progress }: { progress: BudgetProgress }) {
           </div>
         </div>
       </div>
-
-      <p className="mt-4 text-xs text-[var(--foreground-muted)]">
-        {progress.daysRemaining} days remaining in {progress.periodLabel.split(" ")[0]}
-      </p>
     </Card>
   );
 }

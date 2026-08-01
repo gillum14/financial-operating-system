@@ -13,6 +13,13 @@ type CashFlowPeriod = {
   netCashFlow: number;
 };
 
+// Real amounts carry cents; a bare toLocaleString() shows however many
+// decimals a given number happens to have (e.g. "$450" next to "$272.73"),
+// so every figure in this card is forced to the same precision.
+function formatAmount(value: number): string {
+  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function FinancialOverviewCard({
   series,
   period,
@@ -40,21 +47,25 @@ export function FinancialOverviewCard({
             <div>
               <p className="text-xs font-medium text-[var(--primary)]">Income</p>
               <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-                ${period.income.toLocaleString()}
+                ${formatAmount(period.income)}
               </p>
             </div>
 
             <div>
               <p className="text-xs font-medium text-[var(--foreground-muted)]">Expenses</p>
               <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-                ${period.expenses.toLocaleString()}
+                ${formatAmount(period.expenses)}
               </p>
             </div>
 
             <div>
               <p className="text-xs font-medium text-[var(--foreground-muted)]">Net Cash Flow</p>
-              <p className="mt-1 text-lg font-semibold text-[var(--success)]">
-                ${period.netCashFlow.toLocaleString()}
+              <p
+                className={`mt-1 text-lg font-semibold ${
+                  period.netCashFlow >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+                }`}
+              >
+                {period.netCashFlow < 0 ? "-" : ""}${formatAmount(Math.abs(period.netCashFlow))}
               </p>
             </div>
           </div>
