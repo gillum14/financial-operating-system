@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 29, 2026
+**Last Updated:** August 2, 2026
 
 ---
 
@@ -2022,11 +2022,11 @@ Financial mutation workflows must not ship without tested rollback and duplicate
 
 The following decisions remain open:
 
-- Final error-class implementation
+- ~~Final error-class implementation~~ — resolved for the Server Action boundary: a six-category taxonomy (`validation`, `authentication`, `authorization`, `domain`, `infrastructure`, `unexpected`) implemented in `src/lib/actions/classify.ts`. Domain-layer error classes (`NotFoundError`, `ValidationError`, `ConflictError`) remain in `src/domains/errors.ts`, extended with optional `fieldErrors`. Application-service, Route Handler, and background-job error-class implementations remain open.
 - Final public error-response schema
 - Final error-code namespace
 - HTTP status mapping
-- Server Action error-return conventions
+- ~~Server Action error-return conventions~~ — resolved: `ActionResult<T>` and `executeAction()` in `src/lib/actions/`. See `docs/standards/coding-standards.md` § Error Handling Standards.
 - Route Handler error-return conventions
 - Error localization strategy
 - User-interface copy catalog
@@ -2093,3 +2093,4 @@ Architecturally significant decisions shall be documented through ADRs.
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-07-29 | Caitlin Gillum | Defined Athena's error-handling philosophy, taxonomy, lifecycle, propagation, translation, user messaging, transaction rollback, retries, idempotency, dependency failures, graceful degradation, reconciliation, logging, audit integration, monitoring, security controls, and testing requirements. |
+| 1.1.0 | 2026-08-02 | Caitlin Gillum | Resolved the "final error-class implementation" and "Server Action error-return conventions" deferred decisions for the Server Action boundary, implemented as `src/lib/actions/` (six-category taxonomy, `executeAction`, safe logging that never leaks infrastructure error text). |
