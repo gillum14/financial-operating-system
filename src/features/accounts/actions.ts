@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getAccountService } from "@/composition/accounts-composition";
@@ -84,7 +85,9 @@ export async function createAccount(rawInput: unknown): Promise<ActionResult<Acc
     const user = await requireActionUser();
     const input = parseAction(createAccountInputSchema, rawInput);
 
-    return getAccountService().createAccount({ ...input, ownerId: user.id });
+    const account = await getAccountService().createAccount({ ...input, ownerId: user.id });
+    revalidatePath("/accounts");
+    return account;
   });
 }
 
@@ -93,7 +96,10 @@ export async function updateAccount(rawInput: unknown): Promise<ActionResult<Acc
     const user = await requireActionUser();
     const { accountId, ...changes } = parseAction(updateAccountInputSchema, rawInput);
 
-    return getAccountService().updateAccount(accountId, user.id, changes);
+    const account = await getAccountService().updateAccount(accountId, user.id, changes);
+    revalidatePath("/accounts");
+    revalidatePath(`/accounts/${accountId}`);
+    return account;
   });
 }
 
@@ -102,7 +108,10 @@ export async function archiveAccount(rawInput: unknown): Promise<ActionResult<Ac
     const user = await requireActionUser();
     const { accountId } = parseAction(accountIdSchema, rawInput);
 
-    return getAccountService().archiveAccount(accountId, user.id);
+    const account = await getAccountService().archiveAccount(accountId, user.id);
+    revalidatePath("/accounts");
+    revalidatePath(`/accounts/${accountId}`);
+    return account;
   });
 }
 
@@ -111,6 +120,9 @@ export async function restoreAccount(rawInput: unknown): Promise<ActionResult<Ac
     const user = await requireActionUser();
     const { accountId } = parseAction(accountIdSchema, rawInput);
 
-    return getAccountService().restoreAccount(accountId, user.id);
+    const account = await getAccountService().restoreAccount(accountId, user.id);
+    revalidatePath("/accounts");
+    revalidatePath(`/accounts/${accountId}`);
+    return account;
   });
 }
