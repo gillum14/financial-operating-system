@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 29, 2026
+**Last Updated:** August 2, 2026
 
 ---
 
@@ -3653,8 +3653,8 @@ The following API decisions remain open:
 - Final request-schema library
 - Final response-schema library
 - Final contract-code organization
-- Final result type
-- Final error-result pattern
+- ~~Final result type~~ — resolved for Server Actions: `ActionResult<T>` (`src/lib/actions/types.ts`). See `docs/standards/coding-standards.md` § Server Action Standards.
+- ~~Final error-result pattern~~ — resolved for Server Actions: `executeAction()` (`src/lib/actions/execute.ts`). Route Handler and future external-API error-result patterns remain open.
 - Final error-code catalog
 - 400 versus 422 validation convention
 - Runtime-validation error mapping
@@ -3755,3 +3755,4 @@ Architecturally significant decisions shall be documented through ADRs.
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-07-29 | Caitlin Gillum | Defined Athena's API architecture, including server interface selection, Server Components, Server Actions, Route Handlers, request and response contracts, authentication, authorization, ownership, validation, pagination, idempotency, concurrency, asynchronous operations, versioning, error responses, security controls, observability, testing, and provisional repository organization. |
+| 1.1.0 | 2026-08-02 | Caitlin Gillum | Resolved the "final result type" and "final error-result pattern" deferred decisions for the Server Action boundary, implemented as `src/lib/actions/` (`ActionResult<T>`, `executeAction`). Route Handler and future external-API error-result patterns remain deferred. |
