@@ -166,8 +166,9 @@ export class FakeAccountRepository implements AccountRepository {
   }
 
   async softDelete(id: string, ownerId: string): Promise<void> {
-    const row = this.rows.get(id);
-    if (row && row.ownerId === ownerId) this.rows.set(id, { ...row, deletedAt: new Date() });
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Account ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
   }
 }
 
