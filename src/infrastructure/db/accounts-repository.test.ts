@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { DbClient } from "@/db/client";
 import { institutions } from "@/db/schema";
+import { NotFoundError } from "@/domains/errors";
 
 import { DrizzleAccountRepository } from "./accounts-repository";
 import { DrizzleInstitutionRepository } from "./institutions-repository";
@@ -66,6 +67,100 @@ describe.skipIf(!hasDatabase)("DrizzleAccountRepository (integration)", () => {
       const reloaded = await accounts.getByIdForOwner(account.id, owner.id);
 
       expect(reloaded?.institutionId).toBeNull();
+    });
+  });
+
+  it("creates and reads back an account by id for its owner", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const owner = await createTestAuthUser(tx);
+
+      const created = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+      const reloaded = await accounts.getByIdForOwner(created.id, owner.id);
+
+      expect(reloaded).toMatchObject({ id: created.id, name: "Checking", status: "active" });
+    });
+  });
+
+  it("returns null when reading another owner's account by id", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const ownerA = await createTestAuthUser(tx);
+      const ownerB = await createTestAuthUser(tx);
+
+      const account = await accounts.create({ ownerId: ownerA.id, name: "A's Checking", accountType: "checking" });
+
+      await expect(accounts.getByIdForOwner(account.id, ownerB.id)).resolves.toBeNull();
+    });
+  });
+
+  it("updates mutable fields without changing ownership", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const owner = await createTestAuthUser(tx);
+      const account = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+
+      const updated = await accounts.update(account.id, owner.id, { name: "Everyday Checking" });
+
+      expect(updated.name).toBe("Everyday Checking");
+      expect(updated.ownerId).toBe(owner.id);
+    });
+  });
+
+  it("throws NotFoundError updating another owner's account", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const ownerA = await createTestAuthUser(tx);
+      const ownerB = await createTestAuthUser(tx);
+      const account = await accounts.create({ ownerId: ownerA.id, name: "A's Checking", accountType: "checking" });
+
+      await expect(accounts.update(account.id, ownerB.id, { name: "Hijacked" })).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+    });
+  });
+
+  it("archives and restores an account, filtering listForOwner by status", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const owner = await createTestAuthUser(tx);
+      const account = await accounts.create({ ownerId: owner.id, name: "Old Card", accountType: "credit-card" });
+
+      const archived = await accounts.archive(account.id, owner.id);
+      expect(archived.status).toBe("archived");
+      await expect(accounts.listForOwner(owner.id, "active")).resolves.toHaveLength(0);
+      await expect(accounts.listForOwner(owner.id, "archived")).resolves.toHaveLength(1);
+      await expect(accounts.listForOwner(owner.id)).resolves.toHaveLength(1);
+
+      const restored = await accounts.restore(account.id, owner.id);
+      expect(restored.status).toBe("active");
+      await expect(accounts.listForOwner(owner.id, "active")).resolves.toHaveLength(1);
+      await expect(accounts.listForOwner(owner.id, "archived")).resolves.toHaveLength(0);
+    });
+  });
+
+  it("throws NotFoundError archiving or restoring another owner's account", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const ownerA = await createTestAuthUser(tx);
+      const ownerB = await createTestAuthUser(tx);
+      const account = await accounts.create({ ownerId: ownerA.id, name: "A's Checking", accountType: "checking" });
+
+      await expect(accounts.archive(account.id, ownerB.id)).rejects.toBeInstanceOf(NotFoundError);
+      await expect(accounts.restore(account.id, ownerB.id)).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  it("excludes a soft-deleted account from a status-filtered list", async () => {
+    await withRollback(db, async (tx) => {
+      const accounts = new DrizzleAccountRepository(tx);
+      const owner = await createTestAuthUser(tx);
+      const account = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+
+      await accounts.softDelete(account.id, owner.id);
+
+      await expect(accounts.listForOwner(owner.id, "active")).resolves.toHaveLength(0);
+      await expect(accounts.getByIdForOwner(account.id, owner.id)).resolves.toBeNull();
     });
   });
 });
