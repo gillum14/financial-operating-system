@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.1.0
+**Document Version:** 1.4.0
 
 **Status:** Draft
 
@@ -692,7 +692,55 @@ RLS does not replace application authorization.
 
 ### Implementation Note (Current State)
 
-**Not yet implemented — remains an open requirement**, explicitly out of scope for the authentication foundation slice that established the identity model above. Ownership is currently enforced only at the application layer (owner-scoped repository methods) and via foreign keys, not by Postgres RLS policies. This is a real gap until RLS lands: a bug in application-layer scoping would not be caught by a second, independent database-level check. Full table RLS policies are the next security-relevant slice this dependency should motivate.
+Implemented for all six current tables (`users`, `accounts`, `categories`, `transactions`, `data_provider_connections`, `institutions`) in `src/db/migrations/0003_row_level_security.sql`. Every table has RLS enabled; every policy is scoped `TO authenticated` explicitly (no policy targets `public` or `anon`); no owned table has a permissive `USING (true)` — that predicate is used exactly once, on `institutions`, which is intentionally shared reference data, not user-owned.
+
+**Coverage by table:**
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| `users` | own row only | none (trigger-only, see Identity Architecture) | own row; column-restricted to `display_name` only | none (see Account Closure Boundary) |
+| `accounts` | `owner_id = auth.uid()` | `WITH CHECK owner_id = auth.uid()` | `USING`/`WITH CHECK owner_id = auth.uid()` (blocks reassignment), column-restricted — see below | none granted |
+| `categories` | same as `accounts` | same | same, column-restricted | none granted |
+| `transactions` | same as `accounts` | same | same, column-restricted | none granted |
+| `data_provider_connections` | same as `accounts` | same | same, column-restricted | none granted |
+| `institutions` | any authenticated user (`USING (true)`) | none granted | none granted | none granted |
+
+No DELETE grant exists on any owned table — the narrowest safe choice, since the application only ever soft-deletes. This can be revisited if a real product need for direct deletion emerges; today it's simply absent, not policied-and-denied.
+
+**Column-level UPDATE hardening** (`src/db/migrations/0004_harden_owned_table_update_grants.sql`). RLS's `WITH CHECK` is row-scoped, not column-scoped — it can reject an update that *results* in a different `owner_id`, but on its own it doesn't stop `id`, `owner_id`, `created_at`, `updated_at`, or `deleted_at` from being grant-eligible for UPDATE in the first place. Column-level `GRANT UPDATE (...)` closes that gap, the same way `users.display_name` was already restricted in 0003. The allowed column list per table is exactly the field set that table's own application-layer update schema already permits (e.g. `AccountService`'s `updateAccountSchema`) — one authoritative source, not redefined at the SQL layer:
+
+| Table | Authenticated may UPDATE only |
+|---|---|
+| `accounts` | `institution_id`, `name`, `account_type`, `masked_account_number`, `currency`, `status`, `balance_source`, `current_balance`, `opening_date`, `closing_date`, `notes` |
+| `categories` | `name`, `parent_category_id` |
+| `transactions` | `category_id`, `transaction_date`, `posting_date`, `original_description`, `merchant`, `amount`, `transaction_type`, `is_excluded`, `notes` |
+| `data_provider_connections` | `institution_id`, `provider_name`, `external_reference`, `status`, `connected_at` |
+
+`id`, `owner_id`, `created_at`, `updated_at`, and `deleted_at` have no UPDATE grant on any owned table — verified empirically against the live database (zero rows returned for a query asking which of those five columns has UPDATE granted to `authenticated`, across all four tables). One observed consequence, confirmed live: attempting to reassign `owner_id` is now rejected at the grant-check level (`permission denied for table X`) before RLS's `WITH CHECK` is ever reached — a strictly stronger guarantee than relying on `WITH CHECK` alone. `updated_at` is deliberately excluded too, not just the obviously-dangerous columns: the application itself never lets a caller set it directly (every repository sets it server-side, `{...changes, updatedAt: new Date()}`), so the authenticated-role grant doesn't either. If a real authenticated-role write path is built later, add a `BEFORE UPDATE` trigger to auto-set `updated_at` rather than granting it directly.
+
+**Roles affected by `REVOKE ALL`, precisely.** Every `REVOKE ALL ON <table> FROM ...` statement in 0003 names exactly `anon, authenticated` — `service_role` is never referenced by 0003 or 0004, in either direction. `service_role`'s grants are exactly whatever Supabase's own project defaults already were before this slice (`REFERENCES`, `TRIGGER`, `TRUNCATE` — no SELECT/INSERT/UPDATE/DELETE), unchanged and unexamined further, since this app has no service-role client and RLS doesn't apply to it anyway (`service_role` also carries `BYPASSRLS` by Supabase default). Resulting table-level grants, verified live:
+
+| Table | `anon` | `authenticated` (table-level) | `service_role` |
+|---|---|---|---|
+| `users` | none | SELECT (+ column UPDATE, above) | REFERENCES, TRIGGER, TRUNCATE |
+| `accounts` / `categories` / `transactions` / `data_provider_connections` | none | SELECT, INSERT (+ column UPDATE, above) | REFERENCES, TRIGGER, TRUNCATE |
+| `institutions` | none | SELECT | REFERENCES, TRIGGER, TRUNCATE |
+
+`anon` has zero privileges of any kind on any of these six tables — full default-deny for unauthenticated Data API access.
+
+**RLS and soft deletion solve different problems, deliberately kept separate.** RLS policies here check ownership only (`owner_id = auth.uid()`) — none of them also filter `deleted_at IS NULL`. Owner-only access remains enforced even for a soft-deleted row: the owner can still see their own deleted rows through a direct authenticated Data API call, exactly as intended, since RLS's job is *who may access a row*, not *whether it's currently considered active*. Whether ordinary application reads include soft-deleted rows stays a repository-filtering concern (`isNull(table.deletedAt)` in the Drizzle query layer) — unchanged by this migration. Administrative recovery of a soft-deleted row (or any workflow needing to reason about deleted rows across owners) will require privileged tooling later; nothing here provides that today.
+
+**Future views.** No new views were added in this slice. Any future view exposed to `authenticated` must either declare `security_invoker = true` (so it runs with the querying user's permissions and existing RLS policies apply to it, not the view creator's) or remain in a schema not exposed to the Data API with no grants to `anon`/`authenticated`. A `security_invoker`-less view over an RLS-protected table would silently bypass RLS for anyone who can query it — this is a well-known Postgres/Supabase footgun and must not happen by accident.
+
+**Two separate trust boundaries — do not conflate them.** The application's own server-side queries (Drizzle, via `DATABASE_URL`) connect as the `postgres` role, which owns every table and has `BYPASSRLS` — RLS has zero effect on that path, verified directly against the live database. Ownership scoping for the app's own queries remains entirely an application-layer concern (owner-scoped repository methods), exactly as before this migration. RLS governs a *different* path: an authenticated user's JWT talking directly to Supabase's Data API (PostgREST) as the `authenticated` role — a path the application doesn't use for data today (only for Auth), but which is now secure by default the moment anything does. A passing Drizzle-based application test is never evidence RLS works; only a test running as `authenticated` with a real `auth.uid()` is.
+
+**Verified two ways**, both against the live development database, both actually run (not just written):
+1. Direct role/claim simulation (`src/infrastructure/db/rls-policies.test.ts`) — sets `ROLE authenticated` and the `request.jwt.claims` GUC that `auth.uid()` itself reads from, inside a rolled-back transaction. Runs with only `DATABASE_URL`; 41 tests, all passing live (36 policy tests + 5 covering the column-level UPDATE hardening below).
+2. Real JWT round-trip through Supabase's actual Auth + Data API (`src/lib/supabase/rls-policies.jwt.test.ts`), signing in as two persistent, non-production test identities (`SUPABASE_TEST_USER_A/B_*`) with `signInWithPassword()` and issuing real PostgREST requests with the resulting session. 20/20 passing live. Confirmed independently, via `curl`, that the Data API correctly resolves `public` schema tables (a genuine Postgres grant error, not a "schema not exposed" error) before ever running the test suite.
+
+Both suites agree. See the slice report for the two non-obvious fixture-creation pitfalls this surfaced (an email-domain validation rule, and required `auth.identities`/token-column state that a naive manual `auth.users` insert doesn't produce) — documented in `README.md`'s "Row Level Security test users" section so they aren't rediscovered the hard way again.
+
+`GRANT`s were necessary alongside every policy: `anon`/`authenticated` had zero SELECT/INSERT/UPDATE/DELETE grants on any of these tables before this migration (verified against the live database) — RLS policies only restrict rows within an operation a role is already granted, they cannot grant the operation itself. The two test identities exist only in this non-production development project; see README for the rotation/recreation procedure and the explicit requirement to delete them before any production cutover.
 
 ---
 
@@ -1819,3 +1867,6 @@ Architecturally significant decisions shall be documented through ADRs.
 |---|---|---|---|
 | 1.0.0 | 2026-07-29 | Caitlin Gillum | Defined Athena's security architecture, threat model, trust boundaries, identity and authorization controls, ownership enforcement, Row Level Security expectations, file and import protections, secrets management, infrastructure security, incident response, vulnerability management, and security testing strategy. |
 | 1.1.0 | 2026-08-01 | Caitlin Gillum | Added implementation notes documenting the Supabase Auth foundation: the canonical identity model (`auth.users.id = public.users.id = owner_id`), the `requireAuthenticatedUser()` trust boundary, the `handle_new_user` profile trigger, server/client Supabase client separation, layered route protection, rate-limit and enumeration-safe error handling, the `ON DELETE RESTRICT` retention posture, and that Row Level Security remains an explicit open requirement. |
+| 1.2.0 | 2026-08-01 | Caitlin Gillum | Documented the completed Row Level Security implementation: per-table policy coverage, the required grants alongside every policy, the trusted-server-vs-user-context trust boundary distinction, and the two live-verified test paths (direct role/claim simulation and real JWT round-trip). |
+| 1.3.0 | 2026-08-01 | Caitlin Gillum | Documented the column-level UPDATE grant hardening (0004), the exact per-role grant table (`anon`/`authenticated`/`service_role`, confirming `service_role` is untouched by the RLS migrations), and completed live verification of the real JWT/PostgREST test suite (previously written but unverified) after fixing two non-obvious test-fixture issues. |
+| 1.4.0 | 2026-08-01 | Caitlin Gillum | Rotated both RLS test-user identities (prior credentials had been exposed in a screenshot) to owner-controlled email aliases and fresh passwords; removed the one remaining example email from README in favor of a fully generic instruction. No content change to policy/grant documentation — credentials only. |

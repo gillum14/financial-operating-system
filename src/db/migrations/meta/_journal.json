@@ -22,6 +22,20 @@
       "when": 1785612399944,
       "tag": "0002_handle_new_user_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785615486483,
+      "tag": "0003_row_level_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785616940606,
+      "tag": "0004_harden_owned_table_update_grants",
+      "breakpoints": true
     }
   ]
 }
