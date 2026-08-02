@@ -50,7 +50,7 @@ const navGroups: NavGroup[] = [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Transactions", href: "/transactions", icon: Activity, disabled: true },
       { label: "Budgets", href: "/budgets", icon: Wallet, disabled: true },
-      { label: "Accounts", href: "/accounts", icon: CreditCard, disabled: true },
+      { label: "Accounts", href: "/accounts", icon: CreditCard },
       { label: "Reports", href: "/reports", icon: FileText, disabled: true },
       { label: "Goals", href: "/goals", icon: Target, disabled: true },
       { label: "Investments", href: "/investments", icon: TrendingUp, disabled: true },

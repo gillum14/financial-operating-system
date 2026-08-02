@@ -28,6 +28,15 @@ vi.mock("@/lib/auth/authenticated-user", () => ({
   getAuthenticatedUser: mockGetAuthenticatedUser,
 }));
 
+// revalidatePath() relies on Next's request-scoped async storage, which
+// doesn't exist outside a real request/server-action invocation — calling
+// the real implementation from a unit test throws. These actions now call
+// it after a successful mutation so the Accounts UI refreshes; the mock
+// just lets that call be a no-op here.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 // A real AccountService over the in-memory fakes, constructed lazily so
 // each test's beforeEach-created repository instances are the ones used —
 // exercises real service business rules (validation, NotFoundError) with
