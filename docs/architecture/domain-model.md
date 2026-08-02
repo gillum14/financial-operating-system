@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.1.0
+**Document Version:** 1.2.0
 
 **Status:** Draft
 
@@ -690,6 +690,55 @@ The final order requires separate design validation before implementation.
 - Classification changes must be auditable.
 - Categories must not be deleted if doing so would corrupt historical reporting.
 - Historical reclassification must be explicit and reviewable.
+
+### Implementation: Category Schema, Hierarchy, and Lifecycle
+
+Implemented in `src/domains/categories/`, `src/application/categories/service.ts`, `src/infrastructure/db/categories-repository.ts`, and `src/features/categories/actions.ts`. Written up following a domain audit (see `docs/adr/README.md` process) that deliberately kept this slice to the canonical schema below rather than pre-emptively adding fields the conceptual model doesn't call for.
+
+**Canonical schema.**
+
+```
+categories
+  id                  uuid PK, server-generated
+  owner_id            uuid  NOT NULL  FK -> users.id ON DELETE RESTRICT
+  name                text  NOT NULL
+  parent_category_id  uuid  NULL      FK -> categories.id ON DELETE RESTRICT (self-referential)
+  created_at          timestamptz NOT NULL DEFAULT now()
+  updated_at          timestamptz NOT NULL DEFAULT now()
+  deleted_at          timestamptz NULL   -- soft-delete only, see Lifecycle below
+```
+
+This is unchanged from the schema that already existed before this slice — no migration was added.
+
+**Two-level hierarchy.** A category is either top-level (`parentCategoryId = null`) or a direct subcategory of a top-level category — never deeper. Enforced in `CategoryService` (not the repository, which stays persistence-only):
+
+- Attaching a child to a category whose own `parentCategoryId` is non-null (i.e., the prospective parent is itself a subcategory) throws `ConflictError`. This is the single check that enforces both "maximum two levels" and "a subcategory may not have children" — they're the same rule.
+- A category referencing itself as `parentCategoryId` throws `ValidationError` — a pure input-shape check (no database read needed), independent of the depth check above.
+- A `parentCategoryId` that doesn't exist, belongs to a different owner, or is soft-deleted all resolve to the same `NotFoundError` from `getByIdForOwner` — cross-owner parent references never reveal whether the foreign category exists (see Ownership guarantees below).
+
+**Lifecycle: soft-delete only, no archive/restore.** Unlike Accounts (`active ⇄ archived` via a dedicated `status` column), Categories have no status column and no reversible archived state — `deletedAt` is the only lifecycle marker. This was a deliberate scope decision, not an oversight:
+
+- No concrete product requirement has asked for a reversible "hidden but not deleted" category state. Categories are classification metadata (§ Data Classification above places them as "Confidential," a tier below the "Highly Sensitive" financial records that justify Accounts' richer lifecycle), and the conceptual model in this section never mentions a category status.
+- **Restore is intentionally omitted.** Nothing in this codebase currently un-soft-deletes a row for any entity, and adding that capability exclusively for Categories — using the shared `deletedAt` column as if it were a reversible archive — would be semantically inconsistent with how every other owned table treats `deletedAt` (a harder, one-way marker; see the Accounts § Implementation above). If a genuine product need for reversible category hiding emerges, the correct fix is a small dedicated migration adding `status: active|archived` plus `archiveCategory`/`restoreCategory` actions, mirroring Accounts exactly — not retrofitting `deletedAt`.
+- Soft-deleting a category is blocked (throws `ConflictError`) when it still has active (non-deleted) children, or when any transaction still references it — both pre-existing `CategoryService` guards, unaffected by this slice. No hard delete exists anywhere in the CRUD surface; the database's `ON DELETE RESTRICT` on `parent_category_id` is a second, independent backstop against orphaning children, exercised directly (bypassing the repository) in `categories-repository.test.ts` to prove it still holds.
+
+**Ownership guarantees.** Every read, mutation, and delete is scoped by both `id` and the caller's `ownerId`, derived exclusively from `requireActionUser()` — never from client input; `createCategory`'s input schema has no `ownerId` field. A cross-owner request — read, update, delete, or use as a parent — resolves through the same owner-scoped query used for a genuinely missing category and is classified as a `domain` error, never a distinct `authorization` response, matching the convention established for Accounts.
+
+*Bug fixed during this slice:* `DrizzleCategoryRepository.softDelete` (and its test fake) previously executed an unconditional `UPDATE ... WHERE id = ? AND owner_id = ?` with no check that a row was actually matched — a cross-owner delete attempt matched zero rows and returned success anyway (a "false success," never surfaced to the caller as any kind of error). Fixed to mirror `update()`'s existing pattern: use `.returning()` and throw `NotFoundError` when nothing matched. The equivalent gap still exists in `DrizzleAccountRepository.softDelete` (out of scope for this slice — Accounts was not modified) and should be fixed the same way in a follow-up.
+
+**CRUD conventions (Server Actions, `src/features/categories/actions.ts`).**
+
+| Action | Behavior |
+|---|---|
+| `getCategory` | Read one, owner-scoped; `NotFoundError` (→ `domain`) if absent, not owned, or soft-deleted |
+| `listActiveCategories` | All non-deleted categories for the caller — "active" here means "not soft-deleted," since there's no separate status to filter further |
+| `createCategory` | `name` required; `parentCategoryId` (if present) must reference an owned, top-level category or the call fails; `ownerId` always `requireActionUser()`'s id |
+| `updateCategory` | Partial update of `name` and/or `parentCategoryId` only; `id`, `ownerId`, and timestamps are not accepted as input |
+| `deleteCategory` | Soft-delete only, blocked while active children or referencing transactions exist |
+
+Every action follows `src/lib/actions/` conventions (`executeAction`, `parseAction`, `requireActionUser`) — validation errors never expose raw Zod output, and infrastructure/unexpected failures never expose provider or database error text.
+
+**Deferred: presentation metadata.** `categoryType`, `icon`, `color`, and `displayOrder` are explicitly not part of this schema. They're pure UI/organizational metadata with no defined behavior in the conceptual model (Business Invariants above: *"Presentation metadata must remain separate from authoritative financial data"*), and adding them without a UI slice to consume them would be exactly the kind of unused abstraction this codebase's coding standards warn against. Add them in the migration that ships alongside the feature that actually renders them.
 
 ---
 
@@ -1746,3 +1795,4 @@ These decisions shall be resolved through architecture design, implementation re
 |---|---|---|---|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Defined Athena's platform-neutral conceptual domain model, core financial domains, aggregate boundaries, relationships, events, state transitions, financial invariants, data classifications, and cross-domain rules. |
 | 1.1.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Account CRUD backend (Slice 2): active/archived lifecycle, archive vs. soft-delete distinction, ownership guarantees, and the `src/features/accounts/actions.ts` Server Action surface. |
+| 1.2.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Category CRUD backend (Slice 3), following a domain audit: canonical schema (no migration), two-level hierarchy enforcement, soft-delete-only lifecycle with restore intentionally omitted, ownership guarantees, and deferred presentation metadata. Records a fix to a cross-owner soft-delete false-success bug found during implementation. |

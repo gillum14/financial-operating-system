@@ -213,8 +213,9 @@ export class FakeCategoryRepository implements CategoryRepository {
   }
 
   async softDelete(id: string, ownerId: string): Promise<void> {
-    const row = this.rows.get(id);
-    if (row && row.ownerId === ownerId) this.rows.set(id, { ...row, deletedAt: new Date() });
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
   }
 }
 

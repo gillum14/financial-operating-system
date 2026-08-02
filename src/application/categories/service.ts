@@ -26,7 +26,7 @@ export class CategoryService {
     }
 
     if (parsed.data.parentCategoryId) {
-      await this.assertOwnedCategory(parsed.data.parentCategoryId, parsed.data.ownerId);
+      await this.assertValidParent(parsed.data.parentCategoryId, parsed.data.ownerId);
     }
 
     return this.categoryRepository.create(parsed.data);
@@ -47,7 +47,10 @@ export class CategoryService {
     }
 
     if (parsed.data.parentCategoryId) {
-      await this.assertOwnedCategory(parsed.data.parentCategoryId, ownerId);
+      if (parsed.data.parentCategoryId === id) {
+        throw new ValidationError("A category cannot be its own parent");
+      }
+      await this.assertValidParent(parsed.data.parentCategoryId, ownerId);
     }
 
     return this.categoryRepository.update(id, ownerId, parsed.data);
@@ -73,10 +76,20 @@ export class CategoryService {
     await this.categoryRepository.softDelete(id, ownerId);
   }
 
-  private async assertOwnedCategory(categoryId: string, ownerId: string): Promise<void> {
-    const category = await this.categoryRepository.getByIdForOwner(categoryId, ownerId);
-    if (!category) {
-      throw new NotFoundError(`Category ${categoryId} not found for this owner`);
+  // Enforces the two-level hierarchy limit (top-level category → direct
+  // subcategory, no deeper) by rejecting any attempt to attach a child to a
+  // category that is itself already a subcategory. Also doubles as the
+  // cross-owner/existence check: getByIdForOwner already excludes other
+  // owners' rows and soft-deleted rows, so an invalid parent — missing,
+  // foreign, or deleted — surfaces as the same generic NotFoundError,
+  // never revealing which case applied.
+  private async assertValidParent(parentCategoryId: string, ownerId: string): Promise<void> {
+    const parent = await this.categoryRepository.getByIdForOwner(parentCategoryId, ownerId);
+    if (!parent) {
+      throw new NotFoundError(`Category ${parentCategoryId} not found for this owner`);
+    }
+    if (parent.parentCategoryId !== null) {
+      throw new ConflictError(`Category ${parentCategoryId} is already a subcategory and cannot have children`);
     }
   }
 }

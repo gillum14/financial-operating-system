@@ -58,9 +58,19 @@ export class DrizzleCategoryRepository implements CategoryRepository {
   }
 
   async softDelete(id: string, ownerId: string): Promise<void> {
-    await this.db
+    // .returning() + a NotFoundError check (matching update()/archive()
+    // above) is required here, not optional: without it, a cross-owner
+    // call matches zero rows and Postgres reports that as an unremarkable
+    // 0-row UPDATE, not an error — silently returning success to the
+    // caller ("false success") instead of failing.
+    const [row] = await this.db
       .update(categories)
       .set({ deletedAt: new Date() })
-      .where(and(eq(categories.id, id), eq(categories.ownerId, ownerId)));
+      .where(and(eq(categories.id, id), eq(categories.ownerId, ownerId), isNull(categories.deletedAt)))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
+    }
   }
 }
