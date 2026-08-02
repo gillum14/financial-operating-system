@@ -79,9 +79,20 @@ export class DrizzleAccountRepository implements AccountRepository {
   }
 
   async softDelete(id: string, ownerId: string): Promise<void> {
-    await this.db
+    // .returning() + a NotFoundError check (matching update()/archive()/
+    // restore() above) is required here, not optional: without it, a
+    // cross-owner call matches zero rows and Postgres reports that as an
+    // unremarkable 0-row UPDATE, not an error — silently returning success
+    // to the caller ("false success") instead of failing. Mirrors the same
+    // fix already applied to DrizzleCategoryRepository.softDelete.
+    const [row] = await this.db
       .update(accounts)
       .set({ deletedAt: new Date() })
-      .where(and(eq(accounts.id, id), eq(accounts.ownerId, ownerId)));
+      .where(and(eq(accounts.id, id), eq(accounts.ownerId, ownerId), isNull(accounts.deletedAt)))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundError(`Account ${id} not found for owner ${ownerId}`);
+    }
   }
 }

@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { DbClient } from "@/db/client";
-import { institutions } from "@/db/schema";
+import { accounts as accountsTable, institutions } from "@/db/schema";
 import { NotFoundError } from "@/domains/errors";
 
 import { DrizzleAccountRepository } from "./accounts-repository";
@@ -161,6 +163,74 @@ describe.skipIf(!hasDatabase)("DrizzleAccountRepository (integration)", () => {
 
       await expect(accounts.listForOwner(owner.id, "active")).resolves.toHaveLength(0);
       await expect(accounts.getByIdForOwner(account.id, owner.id)).resolves.toBeNull();
+    });
+  });
+
+  // Regression coverage for the softDelete false-success bug: an
+  // unconditional UPDATE ... WHERE id = ? AND owner_id = ? matched zero
+  // rows on a cross-owner or nonexistent id and returned success anyway.
+  // Mirrors the same fix and test shape already applied to
+  // DrizzleCategoryRepository.softDelete (see categories-repository.test.ts).
+  describe("softDelete verification", () => {
+    it("allows the owner to soft-delete their own account", async () => {
+      await withRollback(db, async (tx) => {
+        const accounts = new DrizzleAccountRepository(tx);
+        const owner = await createTestAuthUser(tx);
+        const account = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+
+        await expect(accounts.softDelete(account.id, owner.id)).resolves.toBeUndefined();
+      });
+    });
+
+    it("throws NotFoundError instead of silently no-oping on a cross-owner soft-delete", async () => {
+      await withRollback(db, async (tx) => {
+        const accounts = new DrizzleAccountRepository(tx);
+        const ownerA = await createTestAuthUser(tx);
+        const ownerB = await createTestAuthUser(tx);
+        const account = await accounts.create({ ownerId: ownerA.id, name: "A's Checking", accountType: "checking" });
+
+        await expect(accounts.softDelete(account.id, ownerB.id)).rejects.toBeInstanceOf(NotFoundError);
+        // The cross-owner attempt must not have mutated anything.
+        await expect(accounts.getByIdForOwner(account.id, ownerA.id)).resolves.not.toBeNull();
+      });
+    });
+
+    it("throws NotFoundError soft-deleting a nonexistent account", async () => {
+      await withRollback(db, async (tx) => {
+        const accounts = new DrizzleAccountRepository(tx);
+        const owner = await createTestAuthUser(tx);
+
+        await expect(accounts.softDelete(randomUUID(), owner.id)).rejects.toBeInstanceOf(NotFoundError);
+      });
+    });
+
+    it("throws NotFoundError soft-deleting an already soft-deleted account", async () => {
+      await withRollback(db, async (tx) => {
+        const accounts = new DrizzleAccountRepository(tx);
+        const owner = await createTestAuthUser(tx);
+        const account = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+        await accounts.softDelete(account.id, owner.id);
+
+        await expect(accounts.softDelete(account.id, owner.id)).rejects.toBeInstanceOf(NotFoundError);
+      });
+    });
+
+    it("sets deletedAt to a real timestamp on a successful soft-delete, leaving it null before", async () => {
+      await withRollback(db, async (tx) => {
+        const accounts = new DrizzleAccountRepository(tx);
+        const owner = await createTestAuthUser(tx);
+        const account = await accounts.create({ ownerId: owner.id, name: "Checking", accountType: "checking" });
+        expect(account.deletedAt).toBeNull();
+
+        await accounts.softDelete(account.id, owner.id);
+
+        // getByIdForOwner filters deletedAt IS NULL, so a direct row read
+        // (bypassing the repository) is the only way to see the value.
+        const [rawRow] = await tx.select().from(accountsTable).where(eq(accountsTable.id, account.id));
+        expect(rawRow).toBeDefined();
+        expect(rawRow.deletedAt).not.toBeNull();
+        expect(rawRow.deletedAt).toBeInstanceOf(Date);
+      });
     });
   });
 });
