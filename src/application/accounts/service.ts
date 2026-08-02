@@ -51,6 +51,14 @@ export class AccountService {
     return this.accountRepository.listForOwner(ownerId);
   }
 
+  async listActiveAccounts(ownerId: string): Promise<Account[]> {
+    return this.accountRepository.listForOwner(ownerId, "active");
+  }
+
+  async listArchivedAccounts(ownerId: string): Promise<Account[]> {
+    return this.accountRepository.listForOwner(ownerId, "archived");
+  }
+
   async getAccount(id: string, ownerId: string): Promise<Account | null> {
     return this.accountRepository.getByIdForOwner(id, ownerId);
   }
@@ -70,6 +78,10 @@ export class AccountService {
 
   async archiveAccount(id: string, ownerId: string): Promise<Account> {
     return this.accountRepository.archive(id, ownerId);
+  }
+
+  async restoreAccount(id: string, ownerId: string): Promise<Account> {
+    return this.accountRepository.restore(id, ownerId);
   }
 
   async deleteAccount(id: string, ownerId: string): Promise<void> {

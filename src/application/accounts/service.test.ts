@@ -95,4 +95,75 @@ describe("AccountService", () => {
 
     await expect(service.getAccount(account.id, ownerId)).resolves.toBeNull();
   });
+
+  it("updates mutable fields via updateAccount", async () => {
+    const account = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+
+    const updated = await service.updateAccount(account.id, ownerId, { name: "Everyday Checking" });
+
+    expect(updated.name).toBe("Everyday Checking");
+    expect(updated.ownerId).toBe(ownerId);
+  });
+
+  it("rejects an update with an invalid field value", async () => {
+    const account = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+
+    await expect(
+      service.updateAccount(account.id, ownerId, { currentBalance: "not-a-decimal" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("rejects updating to a nonexistent institution", async () => {
+    const account = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+
+    await expect(
+      service.updateAccount(account.id, ownerId, { institutionId: randomUUID() }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("throws NotFoundError updating another owner's account", async () => {
+    const account = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+
+    await expect(
+      service.updateAccount(account.id, randomUUID(), { name: "Hijacked" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("listActiveAccounts excludes archived accounts", async () => {
+    const active = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+    const toArchive = await service.createAccount({ ownerId, name: "Old Card", accountType: "credit-card" });
+    await service.archiveAccount(toArchive.id, ownerId);
+
+    const activeAccounts = await service.listActiveAccounts(ownerId);
+
+    expect(activeAccounts.map((a) => a.id)).toEqual([active.id]);
+  });
+
+  it("listArchivedAccounts returns only archived accounts", async () => {
+    await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+    const toArchive = await service.createAccount({ ownerId, name: "Old Card", accountType: "credit-card" });
+    await service.archiveAccount(toArchive.id, ownerId);
+
+    const archivedAccounts = await service.listArchivedAccounts(ownerId);
+
+    expect(archivedAccounts.map((a) => a.id)).toEqual([toArchive.id]);
+  });
+
+  it("restoreAccount moves an archived account back to active", async () => {
+    const account = await service.createAccount({ ownerId, name: "Old Card", accountType: "credit-card" });
+    await service.archiveAccount(account.id, ownerId);
+
+    const restored = await service.restoreAccount(account.id, ownerId);
+
+    expect(restored.status).toBe("active");
+    await expect(service.listActiveAccounts(ownerId)).resolves.toHaveLength(1);
+    await expect(service.listArchivedAccounts(ownerId)).resolves.toHaveLength(0);
+  });
+
+  it("throws NotFoundError archiving or restoring another owner's account", async () => {
+    const account = await service.createAccount({ ownerId, name: "Checking", accountType: "checking" });
+
+    await expect(service.archiveAccount(account.id, randomUUID())).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.restoreAccount(account.id, randomUUID())).rejects.toBeInstanceOf(NotFoundError);
+  });
 });

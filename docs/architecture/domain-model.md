@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 26, 2026
+**Last Updated:** August 2, 2026
 
 ---
 
@@ -335,6 +335,36 @@ Full account numbers should not be required or retained.
 - Account deletion must not silently orphan historical transactions.
 - Account type determines applicable behavior but must not override explicit transaction data.
 - Currency is U.S. dollars for Version 1.
+
+### Implementation: Account Lifecycle and CRUD
+
+Implemented in `src/domains/accounts/`, `src/application/accounts/service.ts`, `src/infrastructure/db/accounts-repository.ts`, and `src/features/accounts/actions.ts`.
+
+**Lifecycle.** An account has exactly two states, `active` and `archived` (`AccountStatus`), plus an orthogonal soft-delete marker (`deletedAt`) shared by every owned table. Archiving is a status transition (`status = 'archived'`), not a delete — it satisfies the "archived accounts remain available for historical reporting" invariant above by construction, since an archived account is still a normal row with an intact `id`/`ownerId`/transaction history. Soft-delete (`deletedAt`) is a separate, harder-to-reverse operation with no Server Action exposed in this slice; nothing in the CRUD surface hard-deletes a row.
+
+```
+create → active ⇄ archived
+           (archive)  (restore)
+```
+
+**Archive behavior.** `archiveAccount`/`restoreAccount` are dedicated operations, each a direct `status` assignment scoped by `id` + `ownerId`, idempotent (archiving an already-archived account, or restoring an already-active one, succeeds and simply re-affirms the state). The general-purpose `updateAccount` Server Action's input schema deliberately excludes `status` — even though migration `0004_harden_owned_table_update_grants.sql` grants `authenticated` UPDATE on the `status` column at the database layer — so that status transitions always go through the archive/restore actions, which name the intent explicitly rather than treating lifecycle state as an incidental field on a generic PATCH.
+
+**Ownership guarantees.** Every read, mutation, archive, and restore is scoped by both `id` and the caller's `ownerId`, derived exclusively from `requireActionUser()` (`src/lib/actions/context.ts`) — never from client input; `createAccount`'s input schema has no `ownerId` field at all. A request against another owner's account — read, update, archive, or restore — resolves through the same owner-scoped repository query used for a genuinely missing account, throws `NotFoundError`, and is classified as a `domain` error by the Server Action framework. This is intentional, not an omission of a distinct "authorization" response: Athena avoids confirming that another owner's resource exists (see `docs/architecture/security-architecture.md` and `docs/architecture/api-architecture.md` § Cross-Owner Response Behavior). Row Level Security (`src/db/migrations/0003_row_level_security.sql`, `0004_harden_owned_table_update_grants.sql`) enforces the same boundary independently at the database layer.
+
+**CRUD conventions (Server Actions, `src/features/accounts/actions.ts`).**
+
+| Action | Behavior |
+|---|---|
+| `getAccount` | Read one, owner-scoped; `NotFoundError` (→ `domain`) if absent or not owned |
+| `listActiveAccounts` | All non-deleted accounts with `status = 'active'` for the caller |
+| `listArchivedAccounts` | All non-deleted accounts with `status = 'archived'` for the caller |
+| `createAccount` | `name` and `accountType` required; `institutionId` (if present) must reference an existing institution or the call fails with `NotFoundError`; `ownerId` always `requireActionUser()`'s id |
+| `updateAccount` | Partial update of mutable fields only (`name`, `accountType`, `institutionId`, `maskedAccountNumber`, `currency`, `balanceSource`, `currentBalance`, `openingDate`, `closingDate`, `notes`); `id`, `ownerId`, timestamps, and `status` are not accepted as input |
+| `archiveAccount` / `restoreAccount` | Dedicated status transitions, see above |
+
+Every action follows `src/lib/actions/` conventions (`executeAction`, `parseAction`, `requireActionUser`) documented in `docs/standards/coding-standards.md` § Server Action Standards — validation errors never expose raw Zod output, and infrastructure/unexpected failures never expose provider or database error text.
+
+**Manual vs. connected accounts.** `balanceSource` (`manual` | `computed`) already distinguishes user-maintained balances from provider-fed ones; this slice does not add a `data_provider_connections` linkage or any Plaid-specific fields, which remain out of scope until a dedicated provider-integration slice.
 
 ---
 
@@ -1715,3 +1745,4 @@ These decisions shall be resolved through architecture design, implementation re
 | Version | Date | Author | Summary |
 |---|---|---|---|
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Defined Athena's platform-neutral conceptual domain model, core financial domains, aggregate boundaries, relationships, events, state transitions, financial invariants, data classifications, and cross-domain rules. |
+| 1.1.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Account CRUD backend (Slice 2): active/archived lifecycle, archive vs. soft-delete distinction, ownership guarantees, and the `src/features/accounts/actions.ts` Server Action surface. |

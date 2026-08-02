@@ -119,8 +119,10 @@ export class FakeAccountRepository implements AccountRepository {
     return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
   }
 
-  async listForOwner(ownerId: string): Promise<Account[]> {
-    return [...this.rows.values()].filter((row) => row.ownerId === ownerId && !row.deletedAt);
+  async listForOwner(ownerId: string, status?: Account["status"]): Promise<Account[]> {
+    return [...this.rows.values()].filter(
+      (row) => row.ownerId === ownerId && !row.deletedAt && (!status || row.status === status),
+    );
   }
 
   async create(input: AccountCreateInput): Promise<Account> {
@@ -157,6 +159,10 @@ export class FakeAccountRepository implements AccountRepository {
 
   async archive(id: string, ownerId: string): Promise<Account> {
     return this.update(id, ownerId, { status: "archived" });
+  }
+
+  async restore(id: string, ownerId: string): Promise<Account> {
+    return this.update(id, ownerId, { status: "active" });
   }
 
   async softDelete(id: string, ownerId: string): Promise<void> {
