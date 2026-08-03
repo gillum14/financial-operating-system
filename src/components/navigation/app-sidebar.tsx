@@ -13,6 +13,7 @@ import {
   Folder,
   LayoutDashboard,
   LogOut,
+  PiggyBank,
   Plug,
   Repeat,
   Settings,
@@ -66,6 +67,12 @@ const navGroups: NavGroup[] = [
       // existed. Still no Investments domain (schema/service/repository),
       // so nothing on the page itself is real yet.
       { label: "Investments", href: "/investments", icon: TrendingUp },
+      // The route now exists — a real page with honest empty states
+      // throughout (see src/app/(authenticated)/retirement/page.tsx),
+      // same as Budgets/Goals/Reports/Missions/Investments before their
+      // backend existed. Still no Retirement domain (schema/service/
+      // repository), so nothing on the page itself is real yet.
+      { label: "Retirement", href: "/retirement", icon: PiggyBank },
       { label: "Net Worth", href: "/net-worth", icon: Activity, disabled: true },
     ],
   },
