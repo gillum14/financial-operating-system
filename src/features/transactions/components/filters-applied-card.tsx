@@ -3,11 +3,10 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
+import { RailCard } from "@/components/ui/rail-card";
 import type { TransactionFilterOption } from "@/application/transactions/transactions-views";
 import { TRANSACTION_TYPES, type TransactionType } from "@/domains/transactions/types";
 import { DATE_RANGE_PRESET_LABELS, DATE_RANGE_PRESETS, type DateRangePreset } from "@/features/transactions/search-params";
-
-import { RailCard } from "./rail-card";
 
 const TYPE_LABELS: Record<TransactionType, string> = {
   income: "Income",

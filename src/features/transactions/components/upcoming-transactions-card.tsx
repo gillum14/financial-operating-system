@@ -1,4 +1,4 @@
-import { RailCard } from "./rail-card";
+import { RailCard } from "@/components/ui/rail-card";
 
 // TECH DEBT: recurring/scheduled transactions are not a concept that
 // exists anywhere in the domain model yet — there's no schema, service, or

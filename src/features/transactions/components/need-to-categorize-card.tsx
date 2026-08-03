@@ -1,6 +1,5 @@
 import Badge from "@/components/ui/badge";
-
-import { RailCard } from "./rail-card";
+import { RailCard } from "@/components/ui/rail-card";
 
 // TECH DEBT: category-suggestion / AI-categorization is explicitly out of
 // scope for this slice — there's no model, heuristic, or "uncategorized

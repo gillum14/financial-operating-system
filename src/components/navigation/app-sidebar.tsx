@@ -51,7 +51,7 @@ const navGroups: NavGroup[] = [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Accounts", href: "/accounts", icon: CreditCard },
       { label: "Transactions", href: "/transactions", icon: Activity },
-      { label: "Budgets", href: "/budgets", icon: Wallet, disabled: true },
+      { label: "Budgets", href: "/budgets", icon: Wallet },
       { label: "Reports", href: "/reports", icon: FileText, disabled: true },
       { label: "Goals", href: "/goals", icon: Target, disabled: true },
       // TECH DEBT: navigation-only. No Missions route, schema, service, or

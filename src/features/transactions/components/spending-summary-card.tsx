@@ -1,9 +1,9 @@
 import ProgressBar from "@/components/ui/progress-bar";
+import { RailCard } from "@/components/ui/rail-card";
 import type { CategorySpendItem } from "@/application/transactions/transactions-views";
 
 import { categoryTone } from "../category-color";
 import { formatCurrency } from "../format";
-import { RailCard } from "./rail-card";
 
 // Real spend grouped by category, over the same filter window as the rest
 // of the page — never a separate "vs last month" comparison, since only
