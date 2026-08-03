@@ -60,7 +60,12 @@ const navGroups: NavGroup[] = [
       // Missions domain (schema/service/repository), so nothing on the
       // page itself is real yet.
       { label: "Missions", href: "/missions", icon: Compass },
-      { label: "Investments", href: "/investments", icon: TrendingUp, disabled: true },
+      // The route now exists — a real page with honest empty states
+      // throughout (see src/app/(authenticated)/investments/page.tsx),
+      // same as Budgets/Goals/Reports/Missions before their backend
+      // existed. Still no Investments domain (schema/service/repository),
+      // so nothing on the page itself is real yet.
+      { label: "Investments", href: "/investments", icon: TrendingUp },
       { label: "Net Worth", href: "/net-worth", icon: Activity, disabled: true },
     ],
   },
