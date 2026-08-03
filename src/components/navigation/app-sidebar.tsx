@@ -73,7 +73,12 @@ const navGroups: NavGroup[] = [
       // backend existed. Still no Retirement domain (schema/service/
       // repository), so nothing on the page itself is real yet.
       { label: "Retirement", href: "/retirement", icon: PiggyBank },
-      { label: "Net Worth", href: "/net-worth", icon: Activity, disabled: true },
+      // The route now exists. Unlike its siblings, this page's top-line
+      // numbers (Net Worth, Total Assets, Total Liabilities) ARE real —
+      // computed from the owner's active Accounts (see
+      // src/composition/net-worth-query.ts) — while history/goal/insight
+      // panels remain honest placeholders pending their own domains.
+      { label: "Net Worth", href: "/net-worth", icon: Activity },
     ],
   },
   {
