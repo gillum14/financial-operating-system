@@ -5,8 +5,8 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUp, ArrowUpRight, type LucideIcon }
 
 import type { TransactionListItem } from "@/application/transactions/transactions-views";
 import type { TransactionType } from "@/domains/transactions/types";
+import { categoryTone } from "@/lib/category-color";
 
-import { categoryTone } from "../category-color";
 import { formatSignedAmount, formatTransactionDate } from "../format";
 
 const TYPE_ICON: Record<TransactionType, LucideIcon> = {

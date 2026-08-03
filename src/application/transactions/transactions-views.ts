@@ -1,5 +1,7 @@
 import type { Transaction, TransactionType } from "@/domains/transactions/types";
 
+import type { CategorySpendItem, SpendingSummary } from "./spending-aggregation";
+
 // Presentation-shaped view models for the Transactions workspace UI, kept
 // outside src/composition/ (server-only) so "use client" components can
 // import these *types* without pulling in a composition-root module — see
@@ -13,26 +15,17 @@ export interface TransactionListItem {
   categoryName: string | null;
 }
 
-export interface TransactionsSummary {
-  income: number;
-  expenses: number;
-  net: number;
-}
+// TransactionsSummary/CategorySpendItem are re-exported (not redefined)
+// from spending-aggregation.ts — that module owns the one real
+// income/expense/category-breakdown computation, shared with the Reports
+// overview, so this file can't drift into a second, subtly different
+// definition of the same numbers.
+export type TransactionsSummary = SpendingSummary;
+export type { CategorySpendItem };
 
 export interface TransactionFilterOption {
   id: string;
   name: string;
-}
-
-export interface CategorySpendItem {
-  categoryId: string | null;
-  categoryName: string;
-  amount: number;
-  // Share of total spend in the active filter window, 0-100. Percentages
-  // across the array sum to ~100 (rounding aside) because a trailing
-  // "Other" entry absorbs every category past the top 6, rather than the
-  // list silently under-accounting for the rest of real spend.
-  percent: number;
 }
 
 export interface TransactionsListView {
