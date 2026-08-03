@@ -8,7 +8,7 @@ import { BudgetsHeader } from "@/features/budgets/components/budgets-header";
 import { BudgetsTabs } from "@/features/budgets/components/budgets-tabs";
 import { OnTrackCard } from "@/features/budgets/components/on-track-card";
 import { RecentAdjustmentsCard } from "@/features/budgets/components/recent-adjustments-card";
-import { BUDGETS_GRID_COLS } from "@/features/budgets/layout";
+import { RAIL_GRID_COLS } from "@/lib/page-grid";
 
 // Live, per-owner data resolved at request time — must never be statically
 // prerendered or cached across owners (same rule as Dashboard/Accounts/
@@ -59,7 +59,7 @@ export default async function BudgetsPage() {
               happens to collapse. Held off until the same custom 1360px
               threshold Transactions uses, for one consistent responsive
               behavior across both pages. */}
-          <div className={`${BUDGETS_GRID_COLS} items-start`}>
+          <div className={`${RAIL_GRID_COLS} items-start`}>
             <div className="min-w-0">
               <BudgetByCategoryCard hasBudget={overview.hasBudget} />
             </div>

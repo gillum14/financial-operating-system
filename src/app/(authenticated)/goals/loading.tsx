@@ -11,34 +11,31 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 function RailSkeleton() {
   return (
     <>
-      <SkeletonBlock className="h-20" />
-      <SkeletonBlock className="h-32" />
+      <SkeletonBlock className="h-24" />
       <SkeletonBlock className="h-24" />
       <SkeletonBlock className="h-24" />
     </>
   );
 }
 
-export default function BudgetsLoading() {
+export default function GoalsLoading() {
   return (
     <div className="space-y-6" aria-busy="true" aria-live="polite">
-      <SkeletonBlock className="h-16 w-64" />
+      <div className="flex items-start justify-between gap-4">
+        <SkeletonBlock className="h-16 w-64" />
+        <SkeletonBlock className="h-10 w-36" />
+      </div>
       <SkeletonBlock className="h-10" />
 
-      {/* Same RAIL_GRID_COLS as the real metrics row: Overall Progress's
-          skeleton lines up with the rail's width, the other 3 share the
-          main column. */}
-      <div className={RAIL_GRID_COLS}>
-        <div className="grid gap-6 sm:grid-cols-3">
-          <SkeletonBlock className="h-28" />
-          <SkeletonBlock className="h-28" />
-          <SkeletonBlock className="h-28" />
-        </div>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <SkeletonBlock className="h-28" />
+        <SkeletonBlock className="h-28" />
+        <SkeletonBlock className="h-28" />
         <SkeletonBlock className="h-28" />
       </div>
 
       <div className={`${RAIL_GRID_COLS} items-start`}>
-        <SkeletonBlock className="h-72" />
+        <SkeletonBlock className="h-96" />
         <div className="hidden space-y-4 min-[1360px]:block">
           <RailSkeleton />
         </div>

@@ -15,6 +15,7 @@ import {
   parseTransactionsSearchParams,
   type TransactionsSearchParams,
 } from "@/features/transactions/search-params";
+import { RAIL_GRID_COLS } from "@/lib/page-grid";
 
 // Live, per-owner data resolved at request time — must never be statically
 // prerendered or cached across owners (same rule as Dashboard/Accounts).
@@ -86,7 +87,7 @@ export default async function TransactionsPage({
           column — at ultra-wide viewports a 1fr-based split would let it
           balloon toward half the page, which the mockup's narrow utility
           rail never does. */}
-      <div className="grid items-start gap-6 min-[1360px]:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className={`${RAIL_GRID_COLS} items-start`}>
         {/* A <div>, not a second <main>: the (authenticated) layout already
             renders the page's one <main> landmark around {children} —
             nesting another <main> inside it is invalid HTML (only one

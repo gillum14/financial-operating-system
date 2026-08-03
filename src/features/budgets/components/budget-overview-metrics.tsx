@@ -2,7 +2,7 @@ import { Target, TrendingUp, Wallet } from "lucide-react";
 
 import StatCard, { StatCaption } from "@/components/ui/stat-card";
 
-import { BUDGETS_GRID_COLS } from "../layout";
+import { RAIL_GRID_COLS } from "@/lib/page-grid";
 
 // All four tiles are honest placeholders while hasBudget is false — "—"
 // rather than "$0.00", since a real zero-dollar budget and "no budget
@@ -10,7 +10,7 @@ import { BUDGETS_GRID_COLS } from "../layout";
 //
 // Layout: Total Budgeted/Spent/Remaining share the main column, Overall
 // Progress gets its own column at the SAME width as the rail below it
-// (BUDGETS_GRID_COLS) — matching the approved mockup, where Overall
+// (RAIL_GRID_COLS) — matching the approved mockup, where Overall
 // Progress lines up with Budget Period/Summary/On Track/Recent
 // Adjustments rather than being a fourth equal-width tile.
 export function BudgetOverviewMetrics({ hasBudget }: { hasBudget: boolean }) {
@@ -22,7 +22,7 @@ export function BudgetOverviewMetrics({ hasBudget }: { hasBudget: boolean }) {
   }
 
   return (
-    <section className={BUDGETS_GRID_COLS}>
+    <section className={RAIL_GRID_COLS}>
       <div className="grid gap-6 sm:grid-cols-3">
         <StatCard label="Total Budgeted" value="—" icon={Wallet}>
           <StatCaption caption="No active budget" />
