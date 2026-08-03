@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
       { label: "Transactions", href: "/transactions", icon: Activity },
       { label: "Budgets", href: "/budgets", icon: Wallet },
       { label: "Reports", href: "/reports", icon: FileText },
-      { label: "Goals", href: "/goals", icon: Target, disabled: true },
+      { label: "Goals", href: "/goals", icon: Target },
       // TECH DEBT: navigation-only. No Missions route, schema, service, or
       // feature directory exists yet — this stays disabled until a
       // dedicated Missions slice implements it. Present now so the
