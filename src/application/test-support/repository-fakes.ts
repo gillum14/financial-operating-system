@@ -228,16 +228,51 @@ export class FakeTransactionRepository implements TransactionRepository {
     return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
   }
 
+  private matchesFilter(row: Transaction, ownerId: string, filter?: TransactionListFilter): boolean {
+    if (row.ownerId !== ownerId || row.deletedAt) return false;
+    if (filter?.accountId && row.accountId !== filter.accountId) return false;
+    if (filter?.categoryId && row.categoryId !== filter.categoryId) return false;
+    if (filter?.transactionType && row.transactionType !== filter.transactionType) return false;
+    if (filter?.dateFrom && row.transactionDate < filter.dateFrom) return false;
+    if (filter?.dateTo && row.transactionDate > filter.dateTo) return false;
+    if (!filter?.includeExcluded && row.isExcluded) return false;
+    if (filter?.search) {
+      const needle = filter.search.toLowerCase();
+      const haystack = `${row.originalDescription} ${row.merchant ?? ""}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  }
+
   async listForOwner(ownerId: string, filter?: TransactionListFilter): Promise<Transaction[]> {
-    return [...this.rows.values()].filter((row) => {
-      if (row.ownerId !== ownerId || row.deletedAt) return false;
-      if (filter?.accountId && row.accountId !== filter.accountId) return false;
-      if (filter?.categoryId && row.categoryId !== filter.categoryId) return false;
-      if (filter?.dateFrom && row.transactionDate < filter.dateFrom) return false;
-      if (filter?.dateTo && row.transactionDate > filter.dateTo) return false;
-      if (!filter?.includeExcluded && row.isExcluded) return false;
-      return true;
+    const matches = [...this.rows.values()].filter((row) => this.matchesFilter(row, ownerId, filter));
+    const direction = filter?.sort ?? "desc";
+
+    // Same stable order as DrizzleTransactionRepository: transactionDate
+    // then id as a tie-breaker (id compared as a plain string — good
+    // enough for a fake; the real repository's DB-generated UUIDs don't
+    // need to sort meaningfully, only deterministically).
+    matches.sort((a, b) => {
+      const dateCmp = a.transactionDate === b.transactionDate ? 0 : a.transactionDate < b.transactionDate ? -1 : 1;
+      const cmp = dateCmp !== 0 ? dateCmp : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      return direction === "asc" ? cmp : -cmp;
     });
+
+    const afterCursor = filter?.cursor
+      ? matches.filter((row) => {
+          const { transactionDate, id } = filter.cursor!;
+          if (row.transactionDate !== transactionDate) {
+            return direction === "asc" ? row.transactionDate > transactionDate : row.transactionDate < transactionDate;
+          }
+          return direction === "asc" ? row.id > id : row.id < id;
+        })
+      : matches;
+
+    return filter?.limit ? afterCursor.slice(0, filter.limit) : afterCursor;
+  }
+
+  async countForOwner(ownerId: string, filter?: TransactionListFilter): Promise<number> {
+    return [...this.rows.values()].filter((row) => this.matchesFilter(row, ownerId, filter)).length;
   }
 
   async create(input: TransactionCreateInput): Promise<Transaction> {
