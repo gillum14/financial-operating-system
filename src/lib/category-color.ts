@@ -1,8 +1,9 @@
 // Categories have no real color of their own in the domain model — this
 // cycles through the app's chart palette, keyed by category so the same
 // category always renders the same color everywhere it appears (the
-// transactions table's pills, the spending summary's bars). Visual
-// variety for scanability only, never presented as a user-set attribute.
+// Transactions table's pills, its spending summary's bars, the Reports
+// spending breakdown). Visual variety for scanability only, never
+// presented as a user-set attribute.
 const CATEGORY_TONES = [
   "var(--chart-1)",
   "var(--chart-2)",

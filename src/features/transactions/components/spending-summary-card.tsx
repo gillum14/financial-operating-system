@@ -1,8 +1,8 @@
 import ProgressBar from "@/components/ui/progress-bar";
 import { RailCard } from "@/components/ui/rail-card";
 import type { CategorySpendItem } from "@/application/transactions/transactions-views";
+import { categoryTone } from "@/lib/category-color";
 
-import { categoryTone } from "../category-color";
 import { formatCurrency } from "../format";
 
 // Real spend grouped by category, over the same filter window as the rest
