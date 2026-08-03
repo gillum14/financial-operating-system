@@ -127,4 +127,88 @@ describe("TransactionService", () => {
 
     await expect(service.getTransaction(transaction.id, ownerId)).resolves.toBeNull();
   });
+
+  it("passes transactionType filter through to the repository", async () => {
+    const account = await accountRepository.create({ ownerId, name: "Checking", accountType: "checking" });
+    await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-05",
+      originalDescription: "PAYCHECK",
+      amount: "2500.00",
+      transactionType: "income",
+    });
+    await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-06",
+      originalDescription: "GROCERY STORE",
+      amount: "-50.00",
+      transactionType: "expense",
+    });
+
+    const incomeOnly = await service.listTransactions(ownerId, { transactionType: "income" });
+
+    expect(incomeOnly).toHaveLength(1);
+    expect(incomeOnly[0].originalDescription).toBe("PAYCHECK");
+  });
+
+  it("passes search filter through to the repository", async () => {
+    const account = await accountRepository.create({ ownerId, name: "Checking", accountType: "checking" });
+    await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-05",
+      originalDescription: "TRADER JOES",
+      amount: "-40.00",
+      transactionType: "expense",
+    });
+    await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-06",
+      originalDescription: "SHELL OIL",
+      amount: "-30.00",
+      transactionType: "expense",
+    });
+
+    const results = await service.listTransactions(ownerId, { search: "trader" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].originalDescription).toBe("TRADER JOES");
+  });
+
+  it("recategorizes a transaction to an owned category", async () => {
+    const account = await accountRepository.create({ ownerId, name: "Checking", accountType: "checking" });
+    const category = await categoryRepository.create({ ownerId, name: "Groceries" });
+    const transaction = await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-05",
+      originalDescription: "GROCERY STORE",
+      amount: "-50.00",
+      transactionType: "expense",
+    });
+
+    const updated = await service.updateTransaction(transaction.id, ownerId, { categoryId: category.id });
+
+    expect(updated.categoryId).toBe(category.id);
+  });
+
+  it("rejects recategorizing to another owner's category", async () => {
+    const account = await accountRepository.create({ ownerId, name: "Checking", accountType: "checking" });
+    const othersCategory = await categoryRepository.create({ ownerId: otherOwnerId, name: "Groceries" });
+    const transaction = await service.createTransaction({
+      ownerId,
+      accountId: account.id,
+      transactionDate: "2026-07-05",
+      originalDescription: "GROCERY STORE",
+      amount: "-50.00",
+      transactionType: "expense",
+    });
+
+    await expect(
+      service.updateTransaction(transaction.id, ownerId, { categoryId: othersCategory.id }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
 });

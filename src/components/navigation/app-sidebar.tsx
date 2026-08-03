@@ -7,6 +7,7 @@ import {
   Activity,
   Bell,
   Calendar,
+  Compass,
   CreditCard,
   FileText,
   Folder,
@@ -48,11 +49,16 @@ const navGroups: NavGroup[] = [
     label: "Mission Control",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Transactions", href: "/transactions", icon: Activity, disabled: true },
-      { label: "Budgets", href: "/budgets", icon: Wallet, disabled: true },
       { label: "Accounts", href: "/accounts", icon: CreditCard },
+      { label: "Transactions", href: "/transactions", icon: Activity },
+      { label: "Budgets", href: "/budgets", icon: Wallet, disabled: true },
       { label: "Reports", href: "/reports", icon: FileText, disabled: true },
       { label: "Goals", href: "/goals", icon: Target, disabled: true },
+      // TECH DEBT: navigation-only. No Missions route, schema, service, or
+      // feature directory exists yet — this stays disabled until a
+      // dedicated Missions slice implements it. Present now so the
+      // Mission Control section's final ordering doesn't shift later.
+      { label: "Missions", href: "/missions", icon: Compass, disabled: true },
       { label: "Investments", href: "/investments", icon: TrendingUp, disabled: true },
       { label: "Net Worth", href: "/net-worth", icon: Activity, disabled: true },
     ],
