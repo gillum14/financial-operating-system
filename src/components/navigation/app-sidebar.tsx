@@ -54,11 +54,12 @@ const navGroups: NavGroup[] = [
       { label: "Budgets", href: "/budgets", icon: Wallet },
       { label: "Reports", href: "/reports", icon: FileText },
       { label: "Goals", href: "/goals", icon: Target },
-      // TECH DEBT: navigation-only. No Missions route, schema, service, or
-      // feature directory exists yet — this stays disabled until a
-      // dedicated Missions slice implements it. Present now so the
-      // Mission Control section's final ordering doesn't shift later.
-      { label: "Missions", href: "/missions", icon: Compass, disabled: true },
+      // The route now exists — a real page with honest empty states
+      // throughout (see src/app/(authenticated)/missions/page.tsx), same
+      // as Budgets/Goals/Reports before their backend existed. Still no
+      // Missions domain (schema/service/repository), so nothing on the
+      // page itself is real yet.
+      { label: "Missions", href: "/missions", icon: Compass },
       { label: "Investments", href: "/investments", icon: TrendingUp, disabled: true },
       { label: "Net Worth", href: "/net-worth", icon: Activity, disabled: true },
     ],
