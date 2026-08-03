@@ -13,12 +13,16 @@ type StatCardProps = {
 export default function StatCard({ label, value, icon: Icon, children }: StatCardProps) {
   return (
     <Card>
-      <div className="flex items-start justify-between">
-        <p className="text-xs font-semibold tracking-[0.12em] text-[var(--foreground-muted)] uppercase">
+      <div className="flex items-start justify-between gap-2">
+        {/* min-w-0 lets this flex item shrink below its unwrapped text
+            width — without it, a longer label in a narrower card (e.g.
+            Missions' "Total Points" once its tile lost the full-width
+            row) doesn't wrap; it just crowds the icon badge instead. */}
+        <p className="min-w-0 text-xs font-semibold tracking-[0.12em] text-[var(--foreground-muted)] uppercase">
           {label}
         </p>
 
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--foreground-secondary)]">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-hover)] text-[var(--foreground-secondary)]">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
       </div>
