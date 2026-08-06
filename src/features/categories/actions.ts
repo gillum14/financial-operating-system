@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCategoryService } from "@/composition/categories-composition";
@@ -9,6 +10,7 @@ import { requireActionUser } from "@/lib/actions/context";
 import { executeAction } from "@/lib/actions/execute";
 import type { ActionResult } from "@/lib/actions/types";
 import { parseAction } from "@/lib/actions/validation";
+import { CATEGORY_COLOR_OPTIONS } from "@/lib/category-color";
 
 const categoryIdSchema = z.object({ categoryId: z.string().uuid() });
 
@@ -17,12 +19,16 @@ const categoryIdSchema = z.object({ categoryId: z.string().uuid() });
 const createCategoryInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   parentCategoryId: z.string().uuid().optional(),
+  color: z.enum(CATEGORY_COLOR_OPTIONS).optional(),
+  description: z.string().trim().max(100).optional(),
 });
 
 const updateCategoryInputSchema = z.object({
   categoryId: z.string().uuid(),
   name: z.string().trim().min(1).max(200).optional(),
   parentCategoryId: z.string().uuid().optional(),
+  color: z.enum(CATEGORY_COLOR_OPTIONS).optional(),
+  description: z.string().trim().max(100).optional(),
 });
 
 export async function getCategory(rawInput: unknown): Promise<ActionResult<Category>> {
@@ -54,7 +60,9 @@ export async function createCategory(rawInput: unknown): Promise<ActionResult<Ca
     const user = await requireActionUser();
     const input = parseAction(createCategoryInputSchema, rawInput);
 
-    return getCategoryService().createCategory({ ...input, ownerId: user.id });
+    const category = await getCategoryService().createCategory({ ...input, ownerId: user.id });
+    revalidatePath("/categories");
+    return category;
   });
 }
 
@@ -63,7 +71,9 @@ export async function updateCategory(rawInput: unknown): Promise<ActionResult<Ca
     const user = await requireActionUser();
     const { categoryId, ...changes } = parseAction(updateCategoryInputSchema, rawInput);
 
-    return getCategoryService().updateCategory(categoryId, user.id, changes);
+    const category = await getCategoryService().updateCategory(categoryId, user.id, changes);
+    revalidatePath("/categories");
+    return category;
   });
 }
 
@@ -78,5 +88,6 @@ export async function deleteCategory(rawInput: unknown): Promise<ActionResult<vo
     const { categoryId } = parseAction(categoryIdSchema, rawInput);
 
     await getCategoryService().deleteCategory(categoryId, user.id);
+    revalidatePath("/categories");
   });
 }

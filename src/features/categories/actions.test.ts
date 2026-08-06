@@ -21,6 +21,10 @@ vi.mock("@/lib/auth/authenticated-user", () => ({
   getAuthenticatedUser: mockGetAuthenticatedUser,
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 vi.mock("@/composition/categories-composition", () => ({
   getCategoryService: () => new CategoryService(repos.categoryRepository, repos.transactionRepository),
 }));

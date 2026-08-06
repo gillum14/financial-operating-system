@@ -94,7 +94,12 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Settings", href: "/settings", icon: Settings, disabled: true },
       { label: "Integrations", href: "/integrations", icon: Plug, disabled: true },
-      { label: "Categories", href: "/categories", icon: Folder, disabled: true },
+      // The route now exists — a real page backed by the existing
+      // Categories domain (schema/service/repository), same pattern as
+      // Budgets/Goals/Reports/.../Net Worth before it. Category and
+      // subcategory data, usage counts, and mutations are all real and
+      // owner-scoped (see src/app/(authenticated)/categories/page.tsx).
+      { label: "Categories", href: "/categories", icon: Folder },
       { label: "Tags", href: "/tags", icon: Tag, disabled: true },
     ],
   },

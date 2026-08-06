@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** July 31, 2026
+**Last Updated:** August 06, 2026
 
 ---
 
@@ -81,16 +81,24 @@ Every product specification follows the same lifecycle.
 
 # Product Specification Index
 
-| Document              | Status  | Version | Purpose                                                                                                  |
-| --------------------- | ------- | ------- | -------------------------------------------------------------------------------------------------------- |
-| Confidence Engine     | Draft   | 1.0.0   | Defines Athena's financial confidence model, scoring philosophy, forecasting, and recommendation engine. |
-| Mission Engine        | Planned | —       | Defines financial missions, rewards, milestones, and celebrations.                                       |
-| Onboarding Experience | Planned | —       | Defines onboarding flow, personalization, and initial dashboard configuration.                           |
-| Financial Brief       | Planned | —       | Defines daily, weekly, monthly, and event-driven financial summaries.                                    |
-| Dashboard Experience  | Planned | —       | Defines dashboard layout, interactions, navigation, and user workflows.                                  |
-| Widget System         | Planned | —       | Defines dashboard customization, widget recommendations, and personalization.                            |
-| Retirement Experience | Planned | —       | Defines retirement planning, readiness scoring, and long-term financial independence.                    |
-| AI Financial Coach    | Planned | —       | Defines conversational financial coaching and intelligent recommendations.                               |
+| Document              | Status  | Version | Purpose                                                                                                                      |
+| --------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard             | Draft   | 1.0.0   | Defines Athena's primary financial workspace, dashboard layout, widgets, navigation, and financial overview experience.      |
+| Accounts              | Draft   | 1.0.0   | Defines account management, balances, ownership, account lifecycle, and financial institution organization.                  |
+| Categories            | Draft   | 1.0.0   | Defines category hierarchy, organization, ordering, usage, archiving, and financial classification.                          |
+| Transactions          | Draft   | 1.0.0   | Defines transaction lifecycle, categorization, merchant normalization, transfers, recurring activity, and financial history. |
+| Budgets               | Draft   | 1.0.0   | Defines Athena's zero-based budgeting philosophy, planning workflows, allocations, and budget lifecycle.                     |
+| Reports               | Draft   | 1.0.0   | Defines financial reporting, aggregations, trends, comparisons, insights, and historical reporting.                          |
+| Goals                 | Draft   | 1.0.0   | Defines financial goals, funding allocations, milestones, contribution tracking, and completion behavior.                    |
+| Missions              | Draft   | 1.0.0   | Defines missions, XP, levels, streaks, rewards, and financial habit formation.                                               |
+| Investments           | Draft   | 1.0.0   | Defines investment accounts, holdings, valuation, performance tracking, and synchronization behavior.                        |
+| Retirement            | Draft   | 1.0.0   | Defines retirement planning, readiness, projections, contribution tracking, and long-term planning.                          |
+| Net Worth             | Draft   | 1.0.0   | Defines assets, liabilities, valuation, historical snapshots, and wealth tracking.                                           |
+| Confidence Engine     | Planned | —       | Defines Athena's financial confidence model, scoring philosophy, forecasting, and recommendation engine.                     |
+| Onboarding Experience | Planned | —       | Defines onboarding flow, personalization, and initial dashboard configuration.                                               |
+| Financial Brief       | Planned | —       | Defines daily, weekly, monthly, and event-driven financial summaries.                                                        |
+| Widget System         | Planned | —       | Defines dashboard customization, widget recommendations, and personalization.                                                |
+| AI Financial Coach    | Planned | —       | Defines conversational financial coaching and intelligent recommendations.                                                   |
 
 ---
 
@@ -102,9 +110,13 @@ The current product roadmap is organized around foundational systems.
 
 - Dashboard
 - Accounts
-- Transactions
 - Categories
+- Transactions
 - Budgets
+- Reports
+- Goals
+- Investments
+- Retirement
 - Net Worth
 - Bank Connections
 
@@ -120,12 +132,12 @@ The current product roadmap is organized around foundational systems.
 
 ---
 
-## Phase 3 — Motivation
+## Phase 3 — Engagement
 
-- Mission Engine
+- Missions
 - Rewards
+- Streaks
 - Milestones
-- Celebrations
 - Financial Journey
 
 ---
@@ -145,14 +157,14 @@ The current product roadmap is organized around foundational systems.
 Every Product Specification should include:
 
 - Standard document header
-- Table of contents
+- Table of Contents
 - Purpose
-- Product philosophy
-- User experience
-- Core principles
-- Functional specification
-- Future roadmap
-- Revision history
+- Product Philosophy
+- User Experience
+- Core Principles
+- Functional Specification
+- Future Roadmap
+- Revision History
 
 Specifications should:
 
@@ -181,8 +193,9 @@ If a proposed feature does not strengthen financial confidence or improve the us
 
 ---
 
-## Revision History
+# Revision History
 
-| Version | Date       | Author         | Summary                                                                                                                                                          |
-| ------- | ---------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0.0   | 2026-07-31 | Caitlin Gillum | Established the Athena Product Specification framework, documentation philosophy, lifecycle, roadmap, and standards governing all future product specifications. |
+| Version | Date       | Author         | Summary                                                                                                                                                                                                                                                                                     |
+| ------- | ---------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-07-31 | Caitlin Gillum | Established the Athena Product Specification framework, documentation philosophy, lifecycle, roadmap, and standards governing all future product specifications.                                                                                                                            |
+| 1.1.0   | 2026-08-06 | Caitlin Gillum | Expanded the Product Specification Index to include Dashboard, Accounts, Categories, Transactions, Budgets, Reports, Goals, Missions, Investments, Retirement, and Net Worth specifications, updated the product roadmap, and aligned the index with Athena's current product architecture. |
