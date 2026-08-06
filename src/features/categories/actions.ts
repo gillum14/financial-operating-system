@@ -23,12 +23,23 @@ const createCategoryInputSchema = z.object({
   description: z.string().trim().max(100).optional(),
 });
 
+// parentCategoryId is nullable — an explicit null is how the client moves a
+// subcategory back to top-level (see CategoryService.updateCategory's
+// "'parentCategoryId' in parsed.data" comment). A plain omission is a
+// no-op; a plain `undefined` value can't be relied on to survive a Server
+// Action call the same way null does, so the client always sends one or
+// the other on purpose, never leaves this ambiguous.
 const updateCategoryInputSchema = z.object({
   categoryId: z.string().uuid(),
   name: z.string().trim().min(1).max(200).optional(),
-  parentCategoryId: z.string().uuid().optional(),
+  parentCategoryId: z.string().uuid().nullable().optional(),
   color: z.enum(CATEGORY_COLOR_OPTIONS).optional(),
   description: z.string().trim().max(100).optional(),
+});
+
+const reorderCategoriesInputSchema = z.object({
+  parentCategoryId: z.string().uuid().nullable(),
+  orderedCategoryIds: z.array(z.string().uuid()).min(1),
 });
 
 export async function getCategory(rawInput: unknown): Promise<ActionResult<Category>> {
@@ -77,11 +88,28 @@ export async function updateCategory(rawInput: unknown): Promise<ActionResult<Ca
   });
 }
 
-// Soft-delete only — no archiveCategory/restoreCategory pair. Categories
-// have no status column to make a reversible archived state meaningful
-// (see domain-model.md); deletedAt is the only lifecycle marker, and
-// restoring a soft-deleted category is intentionally not implemented in
-// this slice.
+// Persists a drag-and-drop reorder of one sibling group at a time — an
+// owner's top-level categories (parentCategoryId: null) or one parent's
+// subcategories. orderedCategoryIds must be exactly that group's current
+// members (CategoryService.reorderCategories verifies this), so a stale or
+// tampered client can't smuggle in a foreign, wrong-group, or archived id.
+export async function reorderCategories(rawInput: unknown): Promise<ActionResult<Category[]>> {
+  return executeAction("reorderCategories", async () => {
+    const user = await requireActionUser();
+    const { parentCategoryId, orderedCategoryIds } = parseAction(reorderCategoriesInputSchema, rawInput);
+
+    const result = await getCategoryService().reorderCategories(user.id, parentCategoryId, orderedCategoryIds);
+    revalidatePath("/categories");
+    return result;
+  });
+}
+
+// Soft-delete only — no restoreCategory. Archived categories disappear
+// from active lists while their historical references stay intact (see
+// categories-specification.md § Archiving); deletedAt is the lifecycle
+// marker, and restoring a soft-deleted category is intentionally not
+// implemented in this slice (see categories-model.md's Future
+// Enhancements § Archived category management).
 export async function deleteCategory(rawInput: unknown): Promise<ActionResult<void>> {
   return executeAction("deleteCategory", async () => {
     const user = await requireActionUser();

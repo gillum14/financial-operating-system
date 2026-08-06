@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { isDbTestingAllowed } from "@/infrastructure/db/test-support/test-db-client";
+
 // Real end-to-end proof of the RLS policies, through the actual path a
 // browser would use: signInWithPassword() against Supabase's real Auth
 // API, producing a real JWT, then real Data API (PostgREST) calls made
@@ -14,7 +16,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Requires SUPABASE_TEST_USER_A_EMAIL/PASSWORD and
 // SUPABASE_TEST_USER_B_EMAIL/PASSWORD to already exist as confirmed users
 // in the target Supabase project's auth.users (see README's RLS test user
-// setup) — this file signs in as them, it does not create them.
+// setup) — this file signs in as them, it does not create them. Also
+// gated behind the same ALLOW_DB_TESTS + TEST_DATABASE_URL requirement as
+// every other DB-backed test (see db-test-guard.ts) — this file's own
+// Data API calls always go through NEXT_PUBLIC_SUPABASE_URL (there is no
+// swappable "test" project for those; they inherently run against
+// whichever project SUPABASE_TEST_USER_A/B belong to), but its cleanup
+// step below uses the trusted DATABASE_URL connection directly, which is
+// exactly the connection the opt-in gate exists to protect.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const userAEmail = process.env.SUPABASE_TEST_USER_A_EMAIL;
@@ -22,7 +31,8 @@ const userAPassword = process.env.SUPABASE_TEST_USER_A_PASSWORD;
 const userBEmail = process.env.SUPABASE_TEST_USER_B_EMAIL;
 const userBPassword = process.env.SUPABASE_TEST_USER_B_PASSWORD;
 
-const hasJwtTestEnv = Boolean(url && anonKey && userAEmail && userAPassword && userBEmail && userBPassword);
+const hasJwtTestEnv =
+  Boolean(url && anonKey && userAEmail && userAPassword && userBEmail && userBPassword) && isDbTestingAllowed();
 
 function newAnonClient(): SupabaseClient {
   // persistSession/autoRefreshToken are browser-storage features that
@@ -37,6 +47,21 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
   let clientB: SupabaseClient;
   let userAId: string;
   let userBId: string;
+
+  // INCIDENT (2026-08-06): this file's cleanup previously deleted by
+  // owner_id alone — e.g. `delete from transactions where owner_id =
+  // userAId` — which removes every row that owner has, not just the ones
+  // this test run created. Against the real seeded test users, that wiped
+  // real accounts/transactions/categories/data_provider_connections data.
+  // See docs/testing.md § Data-loss incident for the full writeup. Fixed
+  // by tracking exactly which rows this run inserted and deleting only
+  // those ids.
+  const createdIds = {
+    accounts: [] as string[],
+    categories: [] as string[],
+    transactions: [] as string[],
+    dataProviderConnections: [] as string[],
+  };
 
   beforeAll(async () => {
     clientA = newAnonClient();
@@ -61,21 +86,39 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
     // this file inserts as User A/B cannot be removed through the Data
     // API at all. Cleanup goes through the trusted Drizzle connection
     // instead, which is a test-lifecycle concern, not a claim that RLS
-    // was bypassed to prove anything.
+    // was bypassed to prove anything. Scoped to exactly the ids this run
+    // recorded via trackId() below — never a blanket owner_id match.
     const { db, queryClient } = await import("@/db/client");
     const schema = await import("@/db/schema");
-    const { eq } = await import("drizzle-orm");
-    for (const ownerId of [userAId, userBId]) {
-      await db.delete(schema.transactions).where(eq(schema.transactions.ownerId, ownerId));
-      await db.delete(schema.dataProviderConnections).where(eq(schema.dataProviderConnections.ownerId, ownerId));
-      await db.delete(schema.accounts).where(eq(schema.accounts.ownerId, ownerId));
-      await db.delete(schema.categories).where(eq(schema.categories.ownerId, ownerId));
+    const { inArray } = await import("drizzle-orm");
+
+    if (createdIds.transactions.length > 0) {
+      await db.delete(schema.transactions).where(inArray(schema.transactions.id, createdIds.transactions));
+    }
+    if (createdIds.dataProviderConnections.length > 0) {
+      await db
+        .delete(schema.dataProviderConnections)
+        .where(inArray(schema.dataProviderConnections.id, createdIds.dataProviderConnections));
+    }
+    if (createdIds.accounts.length > 0) {
+      await db.delete(schema.accounts).where(inArray(schema.accounts.id, createdIds.accounts));
+    }
+    if (createdIds.categories.length > 0) {
+      await db.delete(schema.categories).where(inArray(schema.categories.id, createdIds.categories));
     }
     await queryClient.end();
 
     await clientA.auth.signOut();
     await clientB.auth.signOut();
   });
+
+  // Records an id for teardown only when the insert actually returned one
+  // — a denied/failed insert (the common case in the "cannot insert ..."
+  // tests below) has no row to track, and pushing `undefined` would make
+  // the inArray() filters above no-ops disguised as real scoping.
+  function trackId(table: keyof typeof createdIds, id: string | undefined): void {
+    if (id) createdIds[table].push(id);
+  }
 
   describe("public.users", () => {
     it("User A can read own profile", async () => {
@@ -113,6 +156,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .from("accounts")
         .insert({ owner_id: userAId, name: "JWT Test Checking", account_type: "checking" })
         .select();
+      trackId("accounts", data?.[0]?.id);
       expect(error).toBeNull();
       expect(data?.[0]?.owner_id).toBe(userAId);
     });
@@ -130,6 +174,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userBId, name: "B JWT Checking", account_type: "checking" })
         .select();
       const accountBId = inserted.data?.[0]?.id;
+      trackId("accounts", accountBId);
 
       const read = await clientA.from("accounts").select().eq("id", accountBId);
       expect(read.data).toHaveLength(0);
@@ -144,6 +189,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userAId, name: "A JWT Checking", account_type: "checking" })
         .select();
       const accountAId = inserted.data?.[0]?.id;
+      trackId("accounts", accountAId);
 
       const { error } = await clientA.from("accounts").update({ owner_id: userBId }).eq("id", accountAId);
       expect(error).not.toBeNull();
@@ -155,6 +201,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userAId, name: "A JWT Checking", account_type: "checking" })
         .select();
       const accountAId = inserted.data?.[0]?.id;
+      trackId("accounts", accountAId);
 
       const { error } = await clientA.from("accounts").delete().eq("id", accountAId);
       expect(error).not.toBeNull();
@@ -164,10 +211,12 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
   describe("categories", () => {
     it("User A can insert and read own categories; not User B's", async () => {
       const ownInsert = await clientA.from("categories").insert({ owner_id: userAId, name: "JWT Housing" }).select();
+      trackId("categories", ownInsert.data?.[0]?.id);
       expect(ownInsert.data?.[0]?.owner_id).toBe(userAId);
 
       const otherInsert = await clientB.from("categories").insert({ owner_id: userBId, name: "JWT Housing" }).select();
       const otherId = otherInsert.data?.[0]?.id;
+      trackId("categories", otherId);
 
       const read = await clientA.from("categories").select().eq("id", otherId);
       expect(read.data).toHaveLength(0);
@@ -186,6 +235,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userAId, name: "A JWT Checking For Txns", account_type: "checking" })
         .select();
       const accountId = account.data?.[0]?.id;
+      trackId("accounts", accountId);
 
       const ownInsert = await clientA
         .from("transactions")
@@ -198,6 +248,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
           transaction_type: "expense",
         })
         .select();
+      trackId("transactions", ownInsert.data?.[0]?.id);
       expect(ownInsert.data?.[0]?.owner_id).toBe(userAId);
     });
 
@@ -207,6 +258,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userBId, name: "B JWT Checking For Txns", account_type: "checking" })
         .select();
       const accountBId = accountB.data?.[0]?.id;
+      trackId("accounts", accountBId);
 
       const { error } = await clientA.from("transactions").insert({
         owner_id: userBId,
@@ -226,6 +278,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .from("data_provider_connections")
         .insert({ owner_id: userAId, provider_name: "manual" })
         .select();
+      trackId("dataProviderConnections", ownInsert.data?.[0]?.id);
       expect(ownInsert.data?.[0]?.owner_id).toBe(userAId);
 
       const otherInsert = await clientB
@@ -233,6 +286,7 @@ describe.skipIf(!hasJwtTestEnv)("Row Level Security policies (real JWT integrati
         .insert({ owner_id: userBId, provider_name: "manual" })
         .select();
       const otherId = otherInsert.data?.[0]?.id;
+      trackId("dataProviderConnections", otherId);
 
       const read = await clientA.from("data_provider_connections").select().eq("id", otherId);
       expect(read.data).toHaveLength(0);

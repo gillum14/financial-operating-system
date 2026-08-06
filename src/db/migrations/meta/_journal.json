@@ -50,6 +50,20 @@
       "when": 1786040088949,
       "tag": "0006_grant_categories_color_description",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786042703265,
+      "tag": "0007_add_categories_sort_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786042746020,
+      "tag": "0008_grant_categories_sort_order",
+      "breakpoints": true
     }
   ]
 }

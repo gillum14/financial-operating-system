@@ -76,9 +76,16 @@ export function AddSubcategoryInline({ parentCategoryId }: { parentCategoryId: s
       </form>
 
       {error && (
-        <p role="alert" className="mt-1.5 rounded-[calc(var(--radius)-8px)] bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
-          {error.message}
-        </p>
+        <div role="alert" className="mt-1.5 rounded-[calc(var(--radius)-8px)] bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
+          <p>{error.message}</p>
+          {error.fieldErrors && (
+            <ul className="mt-1 list-inside list-disc">
+              {Object.entries(error.fieldErrors).map(([field, messages]) => (
+                <li key={field}>{messages.join(" ")}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );

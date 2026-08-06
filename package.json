@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed/index.ts",
-    "test": "vitest run"
+    "db:seed": "node --env-file=.env.local node_modules/.bin/tsx src/db/seed/index.ts",
+    "test": "vitest run",
+    "test:db": "ALLOW_DB_TESTS=true node --env-file=.env.local node_modules/.bin/vitest run --no-file-parallelism src/infrastructure/db/*.test.ts src/composition/dashboard-composition.test.ts src/lib/supabase/rls-policies.jwt.test.ts",
+    "test:full": "npm run test && npm run test:db"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

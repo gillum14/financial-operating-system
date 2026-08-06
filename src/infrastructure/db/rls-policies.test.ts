@@ -7,14 +7,17 @@ import type { DbClient } from "@/db/client";
 import { accounts, categories, dataProviderConnections, institutions, transactions, users } from "@/db/schema";
 
 import { runAsAuthenticatedUser } from "./test-support/run-as-authenticated-user";
+import { createTestDbClient, isDbTestingAllowed } from "./test-support/test-db-client";
 import { withRollback } from "./test-support/with-rollback";
 
-// Requires a real DATABASE_URL — same skip pattern as the other DB-gated
-// integration tests. Also requires the two fixed RLS test identities to
-// already exist in auth.users (see .env.local / README's "RLS test users"
-// setup) — they are NOT created or torn down by this file; they're a
-// persistent, non-production fixture on the dev project.
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+// See db-test-guard.ts — requires ALLOW_DB_TESTS=true and a separate
+// TEST_DATABASE_URL, never DATABASE_URL. Skipped entirely (and no real
+// connection opened) when the guard refuses. Also requires the two fixed
+// RLS test identities to already exist in auth.users (see .env.local /
+// README's "RLS test users" setup) — they are NOT created or torn down by
+// this file; they're a persistent, non-production fixture on the dev
+// project.
+const hasDatabase = isDbTestingAllowed();
 const USER_A_ID = "10000000-0000-4000-8000-00000000000a";
 const USER_B_ID = "10000000-0000-4000-8000-00000000000b";
 
@@ -49,10 +52,10 @@ describe.skipIf(!hasDatabase)("Row Level Security policies (integration)", () =>
   let db: DbClient;
   let close: () => Promise<void>;
 
-  beforeAll(async () => {
-    const client = await import("@/db/client");
+  beforeAll(() => {
+    const client = createTestDbClient();
     db = client.db;
-    close = () => client.queryClient.end();
+    close = client.close;
   });
 
   afterAll(async () => {

@@ -172,6 +172,11 @@ export class FakeAccountRepository implements AccountRepository {
   }
 }
 
+function bySortOrderThenCreatedAt(a: Category, b: Category): number {
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+  return a.createdAt.getTime() - b.createdAt.getTime();
+}
+
 export class FakeCategoryRepository implements CategoryRepository {
   private readonly rows = new Map<string, Category>();
 
@@ -181,13 +186,15 @@ export class FakeCategoryRepository implements CategoryRepository {
   }
 
   async listForOwner(ownerId: string): Promise<Category[]> {
-    return [...this.rows.values()].filter((row) => row.ownerId === ownerId && !row.deletedAt);
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId && !row.deletedAt)
+      .sort(bySortOrderThenCreatedAt);
   }
 
   async listChildren(parentCategoryId: string, ownerId: string): Promise<Category[]> {
-    return [...this.rows.values()].filter(
-      (row) => row.parentCategoryId === parentCategoryId && row.ownerId === ownerId && !row.deletedAt,
-    );
+    return [...this.rows.values()]
+      .filter((row) => row.parentCategoryId === parentCategoryId && row.ownerId === ownerId && !row.deletedAt)
+      .sort(bySortOrderThenCreatedAt);
   }
 
   async create(input: CategoryCreateInput): Promise<Category> {
@@ -199,6 +206,7 @@ export class FakeCategoryRepository implements CategoryRepository {
       parentCategoryId: input.parentCategoryId ?? null,
       color: input.color ?? null,
       description: input.description ?? null,
+      sortOrder: input.sortOrder ?? 0,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -219,6 +227,19 @@ export class FakeCategoryRepository implements CategoryRepository {
     const row = await this.getByIdForOwner(id, ownerId);
     if (!row) throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
     this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+
+  async reorder(ownerId: string, orderedIds: string[]): Promise<Category[]> {
+    const updated: Category[] = [];
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const id = orderedIds[index];
+      const row = await this.getByIdForOwner(id, ownerId);
+      if (!row) throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
+      const next = { ...row, sortOrder: index, updatedAt: new Date() };
+      this.rows.set(id, next);
+      updated.push(next);
+    }
+    return updated;
   }
 }
 

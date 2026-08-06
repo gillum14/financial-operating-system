@@ -4,21 +4,22 @@ import type { DbClient } from "@/db/client";
 
 import { DrizzleUserRepository } from "./users-repository";
 import { createTestAuthUser } from "./test-support/create-test-auth-user";
+import { createTestDbClient, isDbTestingAllowed } from "./test-support/test-db-client";
 import { withRollback } from "./test-support/with-rollback";
 
-// Requires a real DATABASE_URL — skipped entirely (import of @/db/client is
-// deferred until here) when one isn't set, so a missing database doesn't
-// break the rest of the test run.
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+// See db-test-guard.ts — requires ALLOW_DB_TESTS=true and a separate
+// TEST_DATABASE_URL, never DATABASE_URL. Skipped entirely (and no real
+// connection opened) when the guard refuses.
+const hasDatabase = isDbTestingAllowed();
 
 describe.skipIf(!hasDatabase)("DrizzleUserRepository (integration)", () => {
   let db: DbClient;
   let close: () => Promise<void>;
 
-  beforeAll(async () => {
-    const client = await import("@/db/client");
+  beforeAll(() => {
+    const client = createTestDbClient();
     db = client.db;
-    close = () => client.queryClient.end();
+    close = client.close;
   });
 
   afterAll(async () => {

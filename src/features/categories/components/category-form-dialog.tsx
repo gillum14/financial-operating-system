@@ -78,7 +78,11 @@ export function CategoryFormDialog({
         {
           categoryId: category.id,
           name: trimmedName,
-          parentCategoryId: parentCategoryId || undefined,
+          // Explicit null (not undefined) when the picker is set to "None"
+          // — that's what tells CategoryService this is really a request
+          // to clear the parent, not just a field the client didn't touch.
+          // See the schema comment in features/categories/actions.ts.
+          parentCategoryId: parentCategoryId || null,
           color,
           description: description.trim() || undefined,
         },
@@ -163,7 +167,14 @@ export function CategoryFormDialog({
 
         {error && (
           <div role="alert" className="rounded-[calc(var(--radius)-8px)] bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
-            {error.message}
+            <p>{error.message}</p>
+            {error.fieldErrors && (
+              <ul className="mt-1 list-inside list-disc">
+                {Object.entries(error.fieldErrors).map(([field, messages]) => (
+                  <li key={field}>{messages.join(" ")}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

@@ -28,7 +28,7 @@ npm run dev
 npm run db:seed
 ```
 
-This attaches the synthetic dev dataset (accounts, categories, transactions) to your real signed-up user. Seeding never touches `public.users` or `auth.users` itself, and never uses a fabricated or production-style identity.
+This attaches the synthetic dev dataset (accounts, categories, transactions) to your real signed-up user. Seeding never touches `public.users` or `auth.users` itself, and never uses a fabricated or production-style identity. `npm run db:seed` loads `.env.local` itself — if `SEED_OWNER_ID` is missing it prints a guided walkthrough of the steps above rather than a raw error. See [`docs/development-seed-baseline.md`](docs/development-seed-baseline.md) for this project's current verified baseline (row counts per table, the seed owner's id) and how to reproduce or re-verify it.
 
 ### Row Level Security test users
 
