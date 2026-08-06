@@ -22,7 +22,8 @@ export class DrizzleCategoryRepository implements CategoryRepository {
     return this.db
       .select()
       .from(categories)
-      .where(and(eq(categories.ownerId, ownerId), isNull(categories.deletedAt)));
+      .where(and(eq(categories.ownerId, ownerId), isNull(categories.deletedAt)))
+      .orderBy(categories.sortOrder, categories.createdAt);
   }
 
   async listChildren(parentCategoryId: string, ownerId: string): Promise<Category[]> {
@@ -35,7 +36,8 @@ export class DrizzleCategoryRepository implements CategoryRepository {
           eq(categories.ownerId, ownerId),
           isNull(categories.deletedAt),
         ),
-      );
+      )
+      .orderBy(categories.sortOrder, categories.createdAt);
   }
 
   async create(input: CategoryCreateInput): Promise<Category> {
@@ -72,5 +74,32 @@ export class DrizzleCategoryRepository implements CategoryRepository {
     if (!row) {
       throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
     }
+  }
+
+  // One transaction per reorder, not a single bulk statement: this repo
+  // has no bulk-CASE-update helper elsewhere, and the per-id NotFoundError
+  // check below (same "false success" concern as softDelete) needs each
+  // row's own affected-count, which a single multi-row UPDATE can't give
+  // per id. orderedIds is expected to be small (one owner's sibling group,
+  // realistically under a few dozen), so N sequential statements inside one
+  // transaction is fine.
+  async reorder(ownerId: string, orderedIds: string[]): Promise<Category[]> {
+    return this.db.transaction(async (tx) => {
+      const updated: Category[] = [];
+      for (let index = 0; index < orderedIds.length; index += 1) {
+        const id = orderedIds[index];
+        const [row] = await tx
+          .update(categories)
+          .set({ sortOrder: index, updatedAt: new Date() })
+          .where(and(eq(categories.id, id), eq(categories.ownerId, ownerId), isNull(categories.deletedAt)))
+          .returning();
+
+        if (!row) {
+          throw new NotFoundError(`Category ${id} not found for owner ${ownerId}`);
+        }
+        updated.push(row);
+      }
+      return updated;
+    });
   }
 }

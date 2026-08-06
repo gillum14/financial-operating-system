@@ -5,7 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CategoryService } from "@/application/categories/service";
 import { FakeCategoryRepository, FakeTransactionRepository } from "@/application/test-support/repository-fakes";
 
-import { createCategory, deleteCategory, getCategory, listActiveCategories, updateCategory } from "./actions";
+import {
+  createCategory,
+  deleteCategory,
+  getCategory,
+  listActiveCategories,
+  reorderCategories,
+  updateCategory,
+} from "./actions";
 
 // vi.mock factories are hoisted above every other top-level statement, so
 // anything they reference must come from vi.hoisted() rather than a plain
@@ -78,6 +85,14 @@ describe("Categories Server Actions", () => {
         success: false,
         error: { category: "authentication" },
       });
+    });
+
+    it("reorderCategories fails with authentication category when unauthenticated", async () => {
+      mockGetAuthenticatedUser.mockResolvedValue(null);
+
+      const result = await reorderCategories({ parentCategoryId: null, orderedCategoryIds: [randomUUID()] });
+
+      expect(result).toMatchObject({ success: false, error: { category: "authentication" } });
     });
   });
 
@@ -155,6 +170,18 @@ describe("Categories Server Actions", () => {
       expect(result).toMatchObject({ success: true, data: { name: "Home", ownerId } });
     });
 
+    it("moves a subcategory back to top-level when parentCategoryId is explicitly null", async () => {
+      signInAs(ownerId);
+      const parent = await createCategory({ name: "Housing" });
+      if (!parent.success) throw new Error("setup failed");
+      const child = await createCategory({ name: "Rent", parentCategoryId: parent.data.id });
+      if (!child.success) throw new Error("setup failed");
+
+      const result = await updateCategory({ categoryId: child.data.id, parentCategoryId: null });
+
+      expect(result).toMatchObject({ success: true, data: { parentCategoryId: null } });
+    });
+
     it("soft-deletes a category with no children or transactions", async () => {
       signInAs(ownerId);
       const created = await createCategory({ name: "Housing" });
@@ -204,6 +231,64 @@ describe("Categories Server Actions", () => {
       const result = await deleteCategory({ categoryId: parent.data.id });
 
       expect(result).toMatchObject({ success: false, error: { category: "domain" } });
+    });
+
+    it("rejects moving a category that already has its own subcategories under another category", async () => {
+      signInAs(ownerId);
+      const parent = await createCategory({ name: "Housing" });
+      if (!parent.success) throw new Error("setup failed");
+      const child = await createCategory({ name: "Rent", parentCategoryId: parent.data.id });
+      if (!child.success) throw new Error("setup failed");
+      const otherTopLevel = await createCategory({ name: "Food" });
+      if (!otherTopLevel.success) throw new Error("setup failed");
+
+      const result = await updateCategory({ categoryId: parent.data.id, parentCategoryId: otherTopLevel.data.id });
+
+      expect(result).toMatchObject({ success: false, error: { category: "domain" } });
+    });
+  });
+
+  describe("reorderCategories", () => {
+    it("persists a new top-level order for the owner's categories", async () => {
+      signInAs(ownerId);
+      const first = await createCategory({ name: "Housing" });
+      const second = await createCategory({ name: "Transportation" });
+      if (!first.success || !second.success) throw new Error("setup failed");
+
+      const result = await reorderCategories({
+        parentCategoryId: null,
+        orderedCategoryIds: [second.data.id, first.data.id],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.map((row) => row.id)).toEqual([second.data.id, first.data.id]);
+    });
+
+    it("fails with validation category when the list doesn't match the current siblings", async () => {
+      signInAs(ownerId);
+      const created = await createCategory({ name: "Housing" });
+      if (!created.success) throw new Error("setup failed");
+
+      const result = await reorderCategories({ parentCategoryId: null, orderedCategoryIds: [randomUUID()] });
+
+      expect(result).toMatchObject({ success: false, error: { category: "validation" } });
+    });
+
+    it("denies reordering another owner's categories without confirming they exist", async () => {
+      signInAs(ownerId);
+      const created = await createCategory({ name: "Housing" });
+      if (!created.success) throw new Error("setup failed");
+
+      signInAs(randomUUID());
+      const result = await reorderCategories({ parentCategoryId: null, orderedCategoryIds: [created.data.id] });
+
+      // The caller's own (empty) top-level group never contains the other
+      // owner's category, so this is indistinguishable from "you sent a
+      // list that doesn't match your siblings" — validation, not domain —
+      // same non-confirming-existence posture as the other cross-owner
+      // tests in this file.
+      expect(result).toMatchObject({ success: false, error: { category: "validation" } });
     });
   });
 

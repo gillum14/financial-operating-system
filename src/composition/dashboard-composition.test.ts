@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-// Requires a real DATABASE_URL — skipped entirely (imports of
-// @/composition/dashboard-composition and @/composition/dashboard-query are
-// deferred until here, since both transitively import @/db/client, which
-// throws at module load without one) when a database isn't configured, same
-// pattern as the Slice 7 repository integration tests.
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+import { isDbTestingAllowed } from "@/infrastructure/db/test-support/test-db-client";
+
+// The one DB-gated test file that intentionally still connects via
+// DATABASE_URL (the app's own pooled connection), not TEST_DATABASE_URL —
+// it exercises the real composition root (@/composition/dashboard-
+// composition, @/composition/dashboard-query), which transitively imports
+// the @/db/client singleton itself. There's no swappable connection to
+// substitute without faking the composition root, which would defeat the
+// point of the test. It is read-only (wires a singleton, reads a
+// snapshot) — no write risk — but still gated behind the same
+// ALLOW_DB_TESTS + TEST_DATABASE_URL requirement as every other DB-backed
+// test (see db-test-guard.ts) so it never runs implicitly just because
+// DATABASE_URL happens to be set.
+const hasDatabase = isDbTestingAllowed();
 // The snapshot test additionally needs a real, already-seeded Supabase Auth
 // user id (see src/db/seed/data.ts / README) — there is no fictional
 // fallback anymore now that public.users.id has a foreign key to

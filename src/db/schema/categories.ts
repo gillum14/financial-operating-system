@@ -1,4 +1,4 @@
-import { index, pgTable, text, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { timestamps } from "./shared-columns";
 import { users } from "./users";
@@ -19,6 +19,13 @@ export const categories = pgTable(
     // color is shown (see src/lib/category-color.ts).
     color: text("color"),
     description: text("description"),
+    // User-defined display order, scoped to (ownerId, parentCategoryId) —
+    // i.e. one ordering sequence for an owner's top-level categories, and a
+    // separate one per parent for its subcategories. Always server-computed
+    // (append-to-end on create/move, explicit set via CategoryService's
+    // reorderCategories) — never client-supplied directly. See
+    // categories-model.md § Category Ordering.
+    sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps,
   },
   (table) => [

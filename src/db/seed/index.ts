@@ -2,17 +2,42 @@ import { db, queryClient } from "../client";
 import { accounts, categories, dataProviderConnections, institutions, transactions } from "../schema";
 import { buildDevData } from "./data";
 
+// Printed as-is (no stack trace, no "Seed failed:" wrapper) — this is an
+// expected, well-understood configuration gap, not an unexpected error,
+// so it gets a guided walkthrough instead of an exception dump. See
+// docs/development-seed-baseline.md for the one-time setup this replaces.
+const MISSING_SEED_OWNER_ID_MESSAGE = `❌ No SEED_OWNER_ID configured.
+
+To initialize the development database:
+
+1. Run:
+   npm run dev
+
+2. Create an account through Athena.
+
+3. Copy that user's UUID from Supabase.
+
+4. Add:
+
+   SEED_OWNER_ID=<uuid>
+
+   to .env.local
+
+5. Run:
+
+   npm run db:seed
+
+This only needs to be completed once unless the database is intentionally reset.`;
+
 // Idempotent: every seed row has a fixed id, so re-running this script only
 // ever inserts rows that don't already exist. public.users is deliberately
 // never inserted into here — that row is created exclusively by the
 // handle_new_user trigger when SEED_OWNER_ID actually signs up.
-async function seed() {
+async function seed(): Promise<boolean> {
   const ownerId = process.env.SEED_OWNER_ID;
   if (!ownerId) {
-    throw new Error(
-      "SEED_OWNER_ID is required. Sign up a real user through the app locally (npm run dev, " +
-        "visit /signup), then set SEED_OWNER_ID in your .env to that user's id — see README.md.",
-    );
+    console.error(MISSING_SEED_OWNER_ID_MESSAGE);
+    return false;
   }
 
   const {
@@ -40,11 +65,17 @@ async function seed() {
 
   await db.insert(dataProviderConnections).values(devDataProviderConnections).onConflictDoNothing();
   console.log(`Seeded ${devDataProviderConnections.length} data provider connection(s)`);
+
+  return true;
 }
 
 seed()
-  .then(() => {
-    console.log("Seed complete.");
+  .then((completed) => {
+    if (completed) {
+      console.log("Seed complete.");
+    } else {
+      process.exitCode = 1;
+    }
   })
   .catch((error: unknown) => {
     console.error("Seed failed:", error);

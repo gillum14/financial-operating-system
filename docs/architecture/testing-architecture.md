@@ -342,6 +342,30 @@ Production tests must never modify real financial records.
 
 ---
 
+# Test Environment Safety
+
+> **Incident (2026-08-06):** a DB-backed test's cleanup step deleted rows
+> by owner ID alone instead of by the specific rows it created, wiping
+> real seeded data on the shared dev database. Full writeup, root cause,
+> and safeguards: [`docs/testing.md`](../testing.md).
+
+DB-backed tests shall:
+
+- Never run without an explicit opt-in (`ALLOW_DB_TESTS=true`).
+- Never connect via the application's own connection string
+  (`DATABASE_URL`) — a separate `TEST_DATABASE_URL` is required, with no
+  fallback.
+- Never run concurrently with each other — sequential execution only.
+- Scope every write and every cleanup step to the exact rows a test
+  created, never to a broader match (owner, table, or otherwise) that
+  could reach rows the test didn't create.
+
+See `docs/testing.md` for the exact commands (`npm run test:db`,
+`npm run test:full`) and the guard implementation
+(`src/infrastructure/db/test-support/db-test-guard.ts`).
+
+---
+
 # Test Data Strategy
 
 Testing shall use only synthetic data.

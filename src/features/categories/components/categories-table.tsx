@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, type DragEvent } from "react";
-import { ChevronDown, ChevronUp, CornerDownRight, GripVertical, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, CornerDownRight, GripVertical, Info, Plus } from "lucide-react";
 
 import type { SubcategoryRow, TopLevelCategoryRow } from "@/application/categories/categories-views";
 import type { Category } from "@/domains/categories/types";
@@ -94,31 +94,46 @@ export function CategoriesTable({
                   </td>
 
                   <td className="px-4 py-3">
-                    {hasSubcategories ? (
-                      <button
-                        type="button"
-                        onClick={() => onToggleExpand(row.category.id)}
-                        aria-label={expanded ? `Collapse ${row.category.name}` : `Expand ${row.category.name}`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-hover)]"
-                      >
-                        {row.subcategories.length}
-                        {expanded ? (
-                          <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        )}
-                      </button>
-                    ) : (
-                      <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-                        —
-                      </span>
-                    )}
+                    {/* Always a real toggle, even with zero subcategories —
+                        expanding is also how the inline "Add Subcategory"
+                        row below gets revealed, so a category can't be
+                        left with no way to gain its first child. */}
+                    <button
+                      type="button"
+                      onClick={() => onToggleExpand(row.category.id)}
+                      aria-label={
+                        hasSubcategories
+                          ? expanded
+                            ? `Collapse ${row.category.name}`
+                            : `Expand ${row.category.name}`
+                          : `Add subcategory to ${row.category.name}`
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-hover)]"
+                    >
+                      {hasSubcategories ? (
+                        <>
+                          {row.subcategories.length}
+                          {expanded ? (
+                            <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          )}
+                        </>
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      )}
+                    </button>
                   </td>
 
                   <td className="px-4 py-3 text-center text-sm text-[var(--foreground-secondary)]">{row.transactionCount}</td>
 
                   <td className="px-4 py-3 text-right">
-                    <CategoryRowMenu category={row.category} onEdit={() => onEdit(row.category, hasSubcategories)} />
+                    <CategoryRowMenu
+                      category={row.category}
+                      onEdit={() => onEdit(row.category, hasSubcategories)}
+                      subcategoryCount={row.subcategories.length}
+                      transactionCount={row.transactionCount}
+                    />
                   </td>
                 </tr>
 
@@ -152,7 +167,11 @@ export function CategoriesTable({
                       </td>
                       <td className="px-4 py-2.5 text-center text-sm text-[var(--foreground-secondary)]">{sub.transactionCount}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <CategoryRowMenu category={sub.category} onEdit={() => onEditSubcategory(sub.category)} />
+                        <CategoryRowMenu
+                          category={sub.category}
+                          onEdit={() => onEditSubcategory(sub.category)}
+                          transactionCount={sub.transactionCount}
+                        />
                       </td>
                     </tr>
                   ))}

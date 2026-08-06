@@ -10,18 +10,22 @@ import { NotFoundError } from "@/domains/errors";
 import { DrizzleAccountRepository } from "./accounts-repository";
 import { DrizzleInstitutionRepository } from "./institutions-repository";
 import { createTestAuthUser } from "./test-support/create-test-auth-user";
+import { createTestDbClient, isDbTestingAllowed } from "./test-support/test-db-client";
 import { withRollback } from "./test-support/with-rollback";
 
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+// See db-test-guard.ts — requires ALLOW_DB_TESTS=true and a separate
+// TEST_DATABASE_URL, never DATABASE_URL. Skipped entirely (and no real
+// connection opened) when the guard refuses.
+const hasDatabase = isDbTestingAllowed();
 
 describe.skipIf(!hasDatabase)("DrizzleAccountRepository (integration)", () => {
   let db: DbClient;
   let close: () => Promise<void>;
 
-  beforeAll(async () => {
-    const client = await import("@/db/client");
+  beforeAll(() => {
+    const client = createTestDbClient();
     db = client.db;
-    close = () => client.queryClient.end();
+    close = client.close;
   });
 
   afterAll(async () => {

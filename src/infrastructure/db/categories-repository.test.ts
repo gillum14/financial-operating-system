@@ -7,18 +7,22 @@ import { NotFoundError } from "@/domains/errors";
 
 import { DrizzleCategoryRepository } from "./categories-repository";
 import { createTestAuthUser } from "./test-support/create-test-auth-user";
+import { createTestDbClient, isDbTestingAllowed } from "./test-support/test-db-client";
 import { withRollback } from "./test-support/with-rollback";
 
-const hasDatabase = Boolean(process.env.DATABASE_URL);
+// See db-test-guard.ts — requires ALLOW_DB_TESTS=true and a separate
+// TEST_DATABASE_URL, never DATABASE_URL. Skipped entirely (and no real
+// connection opened) when the guard refuses.
+const hasDatabase = isDbTestingAllowed();
 
 describe.skipIf(!hasDatabase)("DrizzleCategoryRepository (integration)", () => {
   let db: DbClient;
   let close: () => Promise<void>;
 
-  beforeAll(async () => {
-    const client = await import("@/db/client");
+  beforeAll(() => {
+    const client = createTestDbClient();
     db = client.db;
-    close = () => client.queryClient.end();
+    close = client.close;
   });
 
   afterAll(async () => {
@@ -163,6 +167,106 @@ describe.skipIf(!hasDatabase)("DrizzleCategoryRepository (integration)", () => {
 
       expect(children).toHaveLength(1);
       expect(children[0].name).toBe("Rent");
+    });
+  });
+
+  it("persists color and description through create and update", async () => {
+    await withRollback(db, async (tx) => {
+      const categoryRepository = new DrizzleCategoryRepository(tx);
+      const owner = await createTestAuthUser(tx);
+
+      const created = await categoryRepository.create({
+        ownerId: owner.id,
+        name: "Housing",
+        color: "#3b82f6",
+        description: "Rent, mortgage, and home upkeep",
+      });
+      expect(created.color).toBe("#3b82f6");
+      expect(created.description).toBe("Rent, mortgage, and home upkeep");
+
+      const updated = await categoryRepository.update(created.id, owner.id, { color: "#22c55e" });
+      expect(updated.color).toBe("#22c55e");
+      // Untouched field survives a partial update.
+      expect(updated.description).toBe("Rent, mortgage, and home upkeep");
+    });
+  });
+
+  it("listForOwner and listChildren order by sortOrder, ascending", async () => {
+    await withRollback(db, async (tx) => {
+      const categoryRepository = new DrizzleCategoryRepository(tx);
+      const owner = await createTestAuthUser(tx);
+
+      const first = await categoryRepository.create({ ownerId: owner.id, name: "Housing", sortOrder: 2 });
+      const second = await categoryRepository.create({ ownerId: owner.id, name: "Transportation", sortOrder: 0 });
+      const third = await categoryRepository.create({ ownerId: owner.id, name: "Utilities", sortOrder: 1 });
+
+      const topLevel = await categoryRepository.listForOwner(owner.id);
+
+      expect(topLevel.map((row) => row.id)).toEqual([second.id, third.id, first.id]);
+
+      const parent = await categoryRepository.create({ ownerId: owner.id, name: "Food", sortOrder: 3 });
+      const laterChild = await categoryRepository.create({
+        ownerId: owner.id,
+        name: "Restaurants",
+        parentCategoryId: parent.id,
+        sortOrder: 1,
+      });
+      const earlierChild = await categoryRepository.create({
+        ownerId: owner.id,
+        name: "Groceries",
+        parentCategoryId: parent.id,
+        sortOrder: 0,
+      });
+
+      const children = await categoryRepository.listChildren(parent.id, owner.id);
+      expect(children.map((row) => row.id)).toEqual([earlierChild.id, laterChild.id]);
+    });
+  });
+
+  describe("reorder", () => {
+    it("sets sortOrder to the position of each id in the given order, atomically", async () => {
+      await withRollback(db, async (tx) => {
+        const categoryRepository = new DrizzleCategoryRepository(tx);
+        const owner = await createTestAuthUser(tx);
+
+        const first = await categoryRepository.create({ ownerId: owner.id, name: "Housing" });
+        const second = await categoryRepository.create({ ownerId: owner.id, name: "Transportation" });
+        const third = await categoryRepository.create({ ownerId: owner.id, name: "Utilities" });
+
+        const reordered = await categoryRepository.reorder(owner.id, [third.id, first.id, second.id]);
+
+        expect(reordered.map((row) => ({ id: row.id, sortOrder: row.sortOrder }))).toEqual([
+          { id: third.id, sortOrder: 0 },
+          { id: first.id, sortOrder: 1 },
+          { id: second.id, sortOrder: 2 },
+        ]);
+
+        const persisted = await categoryRepository.listForOwner(owner.id);
+        expect(persisted.map((row) => row.id)).toEqual([third.id, first.id, second.id]);
+      });
+    });
+
+    it("throws NotFoundError and applies nothing when one id belongs to another owner", async () => {
+      await withRollback(db, async (tx) => {
+        const categoryRepository = new DrizzleCategoryRepository(tx);
+        const ownerA = await createTestAuthUser(tx);
+        const ownerB = await createTestAuthUser(tx);
+
+        // sortOrder: 9 is deliberately far from 0 — reorder() would set it
+        // to 0 (its index in the list below) if the first iteration's
+        // write actually stuck, so seeing it survive as 9 (not silently
+        // changed to 0) is what proves the transaction rolled back rather
+        // than partially applying before the second id failed.
+        const ownedByA = await categoryRepository.create({ ownerId: ownerA.id, name: "Housing", sortOrder: 9 });
+        const ownedByB = await categoryRepository.create({ ownerId: ownerB.id, name: "Someone else's" });
+
+        await expect(categoryRepository.reorder(ownerA.id, [ownedByA.id, ownedByB.id])).rejects.toBeInstanceOf(
+          NotFoundError,
+        );
+
+        const reloaded = await categoryRepository.getByIdForOwner(ownedByA.id, ownerA.id);
+        expect(reloaded?.sortOrder).toBe(9);
+      });
     });
   });
 });

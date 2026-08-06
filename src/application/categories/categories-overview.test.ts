@@ -15,6 +15,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     parentCategoryId: null,
     color: null,
     description: null,
+    sortOrder: 0,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
