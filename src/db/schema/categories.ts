@@ -14,6 +14,11 @@ export const categories = pgTable(
     parentCategoryId: uuid("parent_category_id").references((): AnyPgColumn => categories.id, {
       onDelete: "restrict",
     }),
+    // Both optional and purely presentational — a null color falls back to
+    // the deterministic categoryTone(name) hash everywhere a category's
+    // color is shown (see src/lib/category-color.ts).
+    color: text("color"),
+    description: text("description"),
     ...timestamps,
   },
   (table) => [

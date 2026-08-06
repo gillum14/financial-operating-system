@@ -43,6 +43,8 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     ownerId: randomUUID(),
     name: "Groceries",
     parentCategoryId: null,
+    color: null,
+    description: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,

@@ -36,6 +36,20 @@
       "when": 1785616940606,
       "tag": "0004_harden_owned_table_update_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786039955079,
+      "tag": "0005_add_categories_color_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786040088949,
+      "tag": "0006_grant_categories_color_description",
+      "breakpoints": true
     }
   ]
 }

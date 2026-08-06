@@ -197,6 +197,8 @@ export class FakeCategoryRepository implements CategoryRepository {
       ownerId: input.ownerId,
       name: input.name,
       parentCategoryId: input.parentCategoryId ?? null,
+      color: input.color ?? null,
+      description: input.description ?? null,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

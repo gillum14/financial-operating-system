@@ -4,11 +4,14 @@ import type { CategoryRepository } from "@/domains/categories/repository";
 import type { Category, CategoryCreateInput, CategoryUpdateInput } from "@/domains/categories/types";
 import { ConflictError, NotFoundError, ValidationError } from "@/domains/errors";
 import type { TransactionRepository } from "@/domains/transactions/repository";
+import { CATEGORY_COLOR_OPTIONS } from "@/lib/category-color";
 
 const createCategorySchema = z.object({
   ownerId: z.string().uuid(),
   name: z.string().trim().min(1).max(200),
   parentCategoryId: z.string().uuid().optional(),
+  color: z.enum(CATEGORY_COLOR_OPTIONS).optional(),
+  description: z.string().trim().max(100).optional(),
 });
 
 const updateCategorySchema = createCategorySchema.omit({ ownerId: true }).partial();
