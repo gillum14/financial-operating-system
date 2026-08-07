@@ -1,6 +1,6 @@
 import { getNetWorthOverview } from "@/composition/net-worth-query";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
-import type { NetWorthCategoryItem } from "@/application/net-worth/net-worth-views";
+import type { AccountBalanceChange, NetWorthCategoryItem } from "@/application/net-worth/net-worth-views";
 import { NetWorthBreakdownCard } from "@/features/net-worth/components/net-worth-breakdown-card";
 import { NetWorthCategoryListCard } from "@/features/net-worth/components/net-worth-category-list-card";
 import { NetWorthHeader } from "@/features/net-worth/components/net-worth-header";
@@ -25,11 +25,13 @@ function RailCards({
   totalLiabilities,
   assetsByCategory,
   hasAccounts,
+  accountBalanceChanges,
 }: {
   netWorth: number;
   totalLiabilities: number;
   assetsByCategory: NetWorthCategoryItem[];
   hasAccounts: boolean;
+  accountBalanceChanges: AccountBalanceChange[];
 }) {
   return (
     <>
@@ -40,7 +42,7 @@ function RailCards({
         hasAccounts={hasAccounts}
       />
       <NetWorthProgressCard />
-      <RecentChangesCard />
+      <RecentChangesCard changes={accountBalanceChanges} />
     </>
   );
 }
@@ -69,6 +71,9 @@ export default async function NetWorthPage() {
         totalAssets={overview.totalAssets}
         totalLiabilities={overview.totalLiabilities}
         hasAccounts={overview.hasAccounts}
+        netWorthChange={overview.netWorthChange}
+        totalAssetsChange={overview.totalAssetsChange}
+        totalLiabilitiesChange={overview.totalLiabilitiesChange}
       />
 
       {/* Two-column shape: main workspace (Net Worth Over Time, the
@@ -79,7 +84,11 @@ export default async function NetWorthPage() {
           one consistent responsive behavior across all seven pages. */}
       <div className={`${RAIL_GRID_COLS} items-start`}>
         <div className="min-w-0 space-y-6">
-          <NetWorthOverTimeCard />
+          <NetWorthOverTimeCard
+            history={overview.history}
+            currentNetWorth={overview.netWorth}
+            hasHistory={overview.hasHistory}
+          />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <NetWorthCategoryListCard
@@ -88,6 +97,7 @@ export default async function NetWorthPage() {
               items={overview.assetsByCategory}
               total={overview.totalAssets}
               emptyText="No assets yet."
+              changes={overview.assetCategoryChanges}
             />
             <NetWorthCategoryListCard
               title="Liabilities by Category"
@@ -95,10 +105,11 @@ export default async function NetWorthPage() {
               items={overview.liabilitiesByCategory}
               total={overview.totalLiabilities}
               emptyText="No liabilities yet."
+              changes={overview.liabilityCategoryChanges}
             />
           </div>
 
-          <NetWorthInsightsPanel />
+          <NetWorthInsightsPanel netWorthChange={overview.netWorthChange} />
         </div>
 
         {/* True grid sibling of the workspace column above, visible only
@@ -110,6 +121,7 @@ export default async function NetWorthPage() {
             totalLiabilities={overview.totalLiabilities}
             assetsByCategory={overview.assetsByCategory}
             hasAccounts={overview.hasAccounts}
+            accountBalanceChanges={overview.accountBalanceChanges}
           />
         </aside>
       </div>
@@ -123,6 +135,7 @@ export default async function NetWorthPage() {
           totalLiabilities={overview.totalLiabilities}
           assetsByCategory={overview.assetsByCategory}
           hasAccounts={overview.hasAccounts}
+          accountBalanceChanges={overview.accountBalanceChanges}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { getAccountPresentation } from "@/application/dashboard/account-presentation";
-import { summarizeAccounts } from "@/application/accounts/accounts-summary";
 import type { Account, AccountType } from "@/domains/accounts/types";
+import type { AccountBalanceSnapshot } from "@/domains/net-worth-history/types";
 
 export interface NetWorthCategoryItem {
   accountType: AccountType;
@@ -27,22 +27,44 @@ export interface NetWorthBreakdown {
 
 // Same liability classification accounts-summary.ts already uses (Credit
 // and Loans display-groups are liabilities, everything else is asset-
-// like) — reused via summarizeAccounts() for the three top-line numbers,
-// so this page's Net Worth/Total Assets/Total Liabilities can never drift
-// from what the Accounts workspace itself reports for the same accounts.
+// like) — reused directly (not via summarizeAccounts, so this file has no
+// dependency on the Accounts domain's own summary type) for the three
+// top-line numbers, so this page's Net Worth/Total Assets/Total
+// Liabilities can never drift from what the Accounts workspace itself
+// reports for the same accounts.
 const LIABILITY_GROUPS = new Set(["Credit", "Loans"]);
 
-export function computeNetWorthBreakdown(accounts: Account[]): NetWorthBreakdown {
-  const { youHave: totalAssets, youOwe: totalLiabilities, difference: netWorth } = summarizeAccounts(accounts);
+// The minimal shape both a live Account and a historical
+// AccountBalanceSnapshot can be reduced to for classification purposes —
+// this is the ONE place account-type-vs-balance math happens for Net
+// Worth, current or historical. Do not duplicate this loop elsewhere;
+// add a new thin mapping wrapper below instead.
+interface NetWorthLineItem {
+  accountType: AccountType;
+  balance: number;
+}
 
+function computeNetWorthBreakdownCore(items: NetWorthLineItem[]): NetWorthBreakdown {
+  let totalAssets = 0;
+  let totalLiabilities = 0;
   const assetAmounts = new Map<AccountType, number>();
   const liabilityAmounts = new Map<AccountType, number>();
 
-  for (const account of accounts) {
-    const balance = account.currentBalance ? Number(account.currentBalance) : 0;
-    const { group } = getAccountPresentation(account.accountType);
-    const bucket = LIABILITY_GROUPS.has(group) ? liabilityAmounts : assetAmounts;
-    bucket.set(account.accountType, (bucket.get(account.accountType) ?? 0) + Math.abs(balance));
+  for (const item of items) {
+    const { group } = getAccountPresentation(item.accountType);
+    const magnitude = Math.abs(item.balance);
+
+    if (LIABILITY_GROUPS.has(group)) {
+      totalLiabilities += magnitude;
+      liabilityAmounts.set(item.accountType, (liabilityAmounts.get(item.accountType) ?? 0) + magnitude);
+    } else {
+      // Assets accumulate the raw (signed) balance, not the magnitude —
+      // an overdrawn asset-like account should reduce total assets, not
+      // inflate it. Category display amounts below still use magnitude,
+      // matching the pre-existing "You Have" convention.
+      totalAssets += item.balance;
+      assetAmounts.set(item.accountType, (assetAmounts.get(item.accountType) ?? 0) + magnitude);
+    }
   }
 
   const toCategoryItems = (amounts: Map<AccountType, number>, total: number): NetWorthCategoryItem[] =>
@@ -56,10 +78,35 @@ export function computeNetWorthBreakdown(accounts: Account[]): NetWorthBreakdown
       .sort((a, b) => b.amount - a.amount);
 
   return {
-    netWorth,
+    netWorth: totalAssets - totalLiabilities,
     totalAssets,
     totalLiabilities,
     assetsByCategory: toCategoryItems(assetAmounts, totalAssets),
     liabilitiesByCategory: toCategoryItems(liabilityAmounts, totalLiabilities),
   };
+}
+
+export function computeNetWorthBreakdown(accounts: Account[]): NetWorthBreakdown {
+  return computeNetWorthBreakdownCore(
+    accounts.map((account) => ({
+      accountType: account.accountType,
+      balance: account.currentBalance ? Number(account.currentBalance) : 0,
+    })),
+  );
+}
+
+// Same computation, fed from immutable historical snapshot rows instead
+// of live accounts — the snapshot's own denormalized accountType/balance
+// are used (never a join back to the live `accounts` table), so this
+// produces the exact totals that existed on snapshotDate even if an
+// account has since changed type or been archived. This is the only Net
+// Worth calculation path for history; there is no separate stored
+// aggregate to keep in sync with it.
+export function computeHistoricalNetWorthBreakdown(snapshots: AccountBalanceSnapshot[]): NetWorthBreakdown {
+  return computeNetWorthBreakdownCore(
+    snapshots.map((snapshot) => ({
+      accountType: snapshot.accountType,
+      balance: Number(snapshot.balance),
+    })),
+  );
 }

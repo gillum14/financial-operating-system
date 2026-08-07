@@ -1,5 +1,6 @@
 import { db, queryClient } from "../client";
 import {
+  accountBalanceSnapshots,
   accounts,
   budgetAllocations,
   budgetPeriods,
@@ -77,6 +78,7 @@ async function seed(): Promise<boolean> {
     devGoals,
     devGoalContributions,
     devGoalAllocations,
+    devNetWorthSnapshots,
   } = buildDevData(ownerId);
 
   await db.insert(institutions).values(devInstitutions).onConflictDoNothing();
@@ -110,6 +112,13 @@ async function seed(): Promise<boolean> {
   console.log(
     `Seeded ${devGoals.length} goal(s), ${devGoalContributions.length} contribution(s), ${devGoalAllocations.length} allocation(s)`,
   );
+
+  // Accounts must already exist (accountId FK) — see the insert above.
+  // CANONICAL SANDBOX ONLY: these are deterministic fixtures built from
+  // the sandbox's own known 12-months-ago account values, never a
+  // fabrication of a real user's history — see net-worth-snapshots.ts.
+  await db.insert(accountBalanceSnapshots).values(devNetWorthSnapshots).onConflictDoNothing();
+  console.log(`Seeded ${devNetWorthSnapshots.length} net worth snapshot(s)`);
 
   return true;
 }

@@ -42,6 +42,8 @@ import type {
 } from "@/domains/goals/types";
 import type { InstitutionRepository } from "@/domains/institutions/repository";
 import type { Institution, InstitutionCreateInput, InstitutionUpdateInput } from "@/domains/institutions/types";
+import type { AccountBalanceSnapshotRepository } from "@/domains/net-worth-history/repository";
+import type { AccountBalanceSnapshot, AccountBalanceSnapshotCreateInput } from "@/domains/net-worth-history/types";
 import type { TransactionRepository } from "@/domains/transactions/repository";
 import type {
   Transaction,
@@ -652,6 +654,61 @@ export class FakeGoalAllocationRepository implements GoalAllocationRepository {
     const row = await this.getByIdForOwner(id, ownerId);
     if (!row) throw new NotFoundError(`Goal allocation ${id} not found for owner ${ownerId}`);
     this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+}
+
+// Insert-only, matching DrizzleAccountBalanceSnapshotRepository — no
+// update/softDelete methods on the real interface either (this table is
+// genuinely immutable, see the schema/migration). createMany replicates
+// the real repository's ON CONFLICT DO NOTHING semantics: a duplicate
+// (accountId, snapshotDate) pair is silently skipped, not overwritten and
+// not duplicated, and only the newly-written rows are returned.
+export class FakeAccountBalanceSnapshotRepository implements AccountBalanceSnapshotRepository {
+  private readonly rows = new Map<string, AccountBalanceSnapshot>();
+  private readonly byAccountAndDate = new Set<string>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<AccountBalanceSnapshot | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId ? row : null;
+  }
+
+  async listForOwner(ownerId: string): Promise<AccountBalanceSnapshot[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId)
+      .sort((a, b) => (a.snapshotDate < b.snapshotDate ? -1 : a.snapshotDate > b.snapshotDate ? 1 : 0));
+  }
+
+  async listForOwnerAndAccount(ownerId: string, accountId: string): Promise<AccountBalanceSnapshot[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId && row.accountId === accountId)
+      .sort((a, b) => (a.snapshotDate < b.snapshotDate ? -1 : a.snapshotDate > b.snapshotDate ? 1 : 0));
+  }
+
+  async createMany(inputs: AccountBalanceSnapshotCreateInput[]): Promise<AccountBalanceSnapshot[]> {
+    const now = new Date();
+    const inserted: AccountBalanceSnapshot[] = [];
+
+    for (const input of inputs) {
+      const conflictKey = `${input.accountId}:${input.snapshotDate}`;
+      if (this.byAccountAndDate.has(conflictKey)) continue;
+
+      const row: AccountBalanceSnapshot = {
+        id: randomUUID(),
+        ownerId: input.ownerId,
+        accountId: input.accountId,
+        snapshotDate: input.snapshotDate,
+        balance: input.balance,
+        accountType: input.accountType,
+        balanceSource: input.balanceSource,
+        snapshotType: input.snapshotType ?? "monthly",
+        createdAt: now,
+      };
+      this.rows.set(row.id, row);
+      this.byAccountAndDate.add(conflictKey);
+      inserted.push(row);
+    }
+
+    return inserted;
   }
 }
 

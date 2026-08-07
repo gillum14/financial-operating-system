@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { DbClient } from "@/db/client";
 import {
+  accountBalanceSnapshots,
   accounts,
   budgetAllocationAdjustments,
   budgetAllocations,
@@ -1430,6 +1431,187 @@ describe.skipIf(!hasDatabase)("Row Level Security policies (integration)", () =>
           await tx.insert(goalAllocations).values({ ownerId: USER_A_ID, goalId: goalA2.id, accountId: accountA.id, amount: "500.00" });
         }),
         /goal_allocations_overallocation/,
+      );
+    });
+  });
+
+  describe("account_balance_snapshots", () => {
+    it("User A can read own snapshots but not User B's", async () => {
+      await withRollback(db, async (tx) => {
+        const [accountA] = await tx
+          .insert(accounts)
+          .values({ ownerId: USER_A_ID, name: "Checking", accountType: "checking", currentBalance: "1000.00" })
+          .returning();
+        const [snapshotA] = await tx
+          .insert(accountBalanceSnapshots)
+          .values({
+            ownerId: USER_A_ID,
+            accountId: accountA.id,
+            snapshotDate: "2026-01-31",
+            balance: "1000.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          })
+          .returning();
+
+        const [accountB] = await tx
+          .insert(accounts)
+          .values({ ownerId: USER_B_ID, name: "Checking", accountType: "checking", currentBalance: "500.00" })
+          .returning();
+        const [snapshotB] = await tx
+          .insert(accountBalanceSnapshots)
+          .values({
+            ownerId: USER_B_ID,
+            accountId: accountB.id,
+            snapshotDate: "2026-01-31",
+            balance: "500.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const own = await tx.select().from(accountBalanceSnapshots).where(eq(accountBalanceSnapshots.id, snapshotA.id));
+        const other = await tx.select().from(accountBalanceSnapshots).where(eq(accountBalanceSnapshots.id, snapshotB.id));
+
+        expect(own).toHaveLength(1);
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    it("User A can insert a snapshot with owner_id = self", async () => {
+      await withRollback(db, async (tx) => {
+        const [accountA] = await tx
+          .insert(accounts)
+          .values({ ownerId: USER_A_ID, name: "Checking", accountType: "checking", currentBalance: "1000.00" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const [row] = await tx
+          .insert(accountBalanceSnapshots)
+          .values({
+            ownerId: USER_A_ID,
+            accountId: accountA.id,
+            snapshotDate: "2026-01-31",
+            balance: "1000.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          })
+          .returning();
+        expect(row.ownerId).toBe(USER_A_ID);
+      });
+    });
+
+    it("User A cannot insert a snapshot owned by User B (cross-owner snapshot IDs fail closed)", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [accountB] = await tx
+            .insert(accounts)
+            .values({ ownerId: USER_B_ID, name: "Checking", accountType: "checking", currentBalance: "500.00" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.insert(accountBalanceSnapshots).values({
+            ownerId: USER_B_ID,
+            accountId: accountB.id,
+            snapshotDate: "2026-01-31",
+            balance: "500.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          });
+        }),
+        /row-level security/,
+      );
+    });
+
+    // No UPDATE grant exists at all — this table is genuinely immutable
+    // (see the migration), unlike goal_allocations' partial UPDATE(amount)
+    // grant. Even a self-owned row's own balance can never be rewritten.
+    it("User A cannot update their own snapshot's balance — no UPDATE grant exists at all", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [accountA] = await tx
+            .insert(accounts)
+            .values({ ownerId: USER_A_ID, name: "Checking", accountType: "checking", currentBalance: "1000.00" })
+            .returning();
+          const [snapshotA] = await tx
+            .insert(accountBalanceSnapshots)
+            .values({
+              ownerId: USER_A_ID,
+              accountId: accountA.id,
+              snapshotDate: "2026-01-31",
+              balance: "1000.00",
+              accountType: "checking",
+              balanceSource: "manual",
+            })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx
+            .update(accountBalanceSnapshots)
+            .set({ balance: "9999999.00" })
+            .where(eq(accountBalanceSnapshots.id, snapshotA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    // No DELETE grant either — matches net-worth-model.md §19 ("Athena
+    // must never modify historical snapshots"); unlike every other owned
+    // table in this schema there is no soft-delete escape hatch here.
+    it("User A cannot delete their own snapshot — no DELETE grant, no ordinary hard-delete path", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [accountA] = await tx
+            .insert(accounts)
+            .values({ ownerId: USER_A_ID, name: "Checking", accountType: "checking", currentBalance: "1000.00" })
+            .returning();
+          const [snapshotA] = await tx
+            .insert(accountBalanceSnapshots)
+            .values({
+              ownerId: USER_A_ID,
+              accountId: accountA.id,
+              snapshotDate: "2026-01-31",
+              balance: "1000.00",
+              accountType: "checking",
+              balanceSource: "manual",
+            })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.delete(accountBalanceSnapshots).where(eq(accountBalanceSnapshots.id, snapshotA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("the unique (account_id, snapshot_date) index rejects a duplicate insert, even as the authenticated role", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [accountA] = await tx
+            .insert(accounts)
+            .values({ ownerId: USER_A_ID, name: "Checking", accountType: "checking", currentBalance: "1000.00" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.insert(accountBalanceSnapshots).values({
+            ownerId: USER_A_ID,
+            accountId: accountA.id,
+            snapshotDate: "2026-01-31",
+            balance: "1000.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          });
+          await tx.insert(accountBalanceSnapshots).values({
+            ownerId: USER_A_ID,
+            accountId: accountA.id,
+            snapshotDate: "2026-01-31",
+            balance: "1050.00",
+            accountType: "checking",
+            balanceSource: "manual",
+          });
+        }),
+        /duplicate key value violates unique constraint/,
       );
     });
   });

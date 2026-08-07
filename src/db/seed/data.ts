@@ -5,6 +5,7 @@ import { connectionFixtures } from "./fixtures/connections";
 import { goalAllocationFixtures } from "./fixtures/goal-allocations";
 import { goalContributionFixtures, goalFixtures } from "./fixtures/goals";
 import { institutionFixtures } from "./fixtures/institutions";
+import { netWorthSnapshotFixtures } from "./fixtures/net-worth-snapshots";
 import { buildTransactions } from "./fixtures/transactions";
 
 // Thin orchestrator only — every row's actual shape lives in
@@ -30,6 +31,7 @@ export function buildDevData(ownerId: string) {
     devGoals: goalFixtures(ownerId),
     devGoalContributions: goalContributionFixtures(ownerId),
     devGoalAllocations: goalAllocationFixtures(ownerId),
+    devNetWorthSnapshots: netWorthSnapshotFixtures(ownerId),
   };
 }
 

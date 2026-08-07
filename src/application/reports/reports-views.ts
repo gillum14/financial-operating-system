@@ -1,6 +1,7 @@
+import type { NetWorthHistoryPoint } from "@/application/net-worth/net-worth-views";
 import type { CategorySpendItem, TransactionsSummary } from "@/application/transactions/transactions-views";
 
-export type { CategorySpendItem };
+export type { CategorySpendItem, NetWorthHistoryPoint };
 
 // Presentation-shaped view model for the Reports overview, kept outside
 // src/composition/ (server-only) so "use client" components can import
@@ -17,4 +18,12 @@ export interface ReportsOverviewView {
   savingsRate: number | null;
   // Real expense-only breakdown by category, same period as `summary`.
   categoryBreakdown: CategorySpendItem[];
+  // Historical Net Worth series (task §9: "Expose Net Worth history to
+  // Reports composition where appropriate") — the exact same
+  // computeNetWorthHistory the Net Worth page itself uses, not a second
+  // calculation. No Reports UI consumes this yet (no existing placeholder
+  // anticipated a Net Worth trend the way Net Worth's/Dashboard's did),
+  // so nothing renders it — exposed here so a future Reports card can
+  // consume it without a composition-layer change.
+  netWorthHistory: NetWorthHistoryPoint[];
 }
