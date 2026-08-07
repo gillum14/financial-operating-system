@@ -18,12 +18,12 @@ export const dynamic = "force-dynamic";
 // stacked-below-threshold block) below — kept as one function so the two
 // render sites can't drift out of sync with each other. Same pattern as
 // Budgets'/Transactions' RailCards.
-function RailCards() {
+function RailCards({ overview }: { overview: Awaited<ReturnType<typeof getGoalsOverview>> }) {
   return (
     <>
-      <ProgressSummaryCard />
+      <ProgressSummaryCard healthSummary={overview.healthSummary} />
       <UpcomingMilestonesCard />
-      <RecentContributionsCard />
+      <RecentContributionsCard contributions={overview.recentContributions} />
     </>
   );
 }
@@ -38,7 +38,10 @@ export default async function GoalsPage() {
     // inflate document.body.scrollWidth past the viewport on narrow
     // screens.
     <div className="min-w-0 space-y-6 overflow-x-hidden">
-      <GoalsHeader />
+      <GoalsHeader
+        linkableAccounts={overview.linkableAccounts ?? []}
+        linkableCategories={overview.linkableCategories ?? []}
+      />
 
       {/* Tabs and the 4 overview metrics are full-width, NOT inside the
           two-column grid below — same fix applied to Budgets: putting the
@@ -50,7 +53,7 @@ export default async function GoalsPage() {
           RAIL_GRID_COLS. */}
       <GoalsTabs>
         <div className="space-y-6">
-          <GoalsOverviewMetrics hasGoals={overview.hasGoals} />
+          <GoalsOverviewMetrics hasGoals={overview.hasGoals} metrics={overview.metrics} />
 
           {/* Two-column shape starts here: main workspace + a narrow
               utility rail as a true grid sibling, not a stack that only
@@ -59,14 +62,18 @@ export default async function GoalsPage() {
               behavior across all three pages. */}
           <div className={`${RAIL_GRID_COLS} items-start`}>
             <div className="min-w-0">
-              <GoalsOverviewCard hasGoals={overview.hasGoals} />
+              <GoalsOverviewCard
+                hasGoals={overview.hasGoals}
+                goals={overview.goals}
+                allocatableAccounts={overview.allocatableAccounts}
+              />
             </div>
 
             {/* True grid sibling of the workspace column above, visible
                 only at the desktop threshold — this is what makes the
                 rail sit beside the workspace rather than below it. */}
             <aside className="hidden space-y-4 min-[1360px]:block">
-              <RailCards />
+              <RailCards overview={overview} />
             </aside>
           </div>
 
@@ -74,7 +81,7 @@ export default async function GoalsPage() {
               and <aside> is hidden — this is the stacked-below rendering
               of the same 3 cards, shown only at those narrower widths. */}
           <div className="space-y-4 min-[1360px]:hidden">
-            <RailCards />
+            <RailCards overview={overview} />
           </div>
         </div>
       </GoalsTabs>

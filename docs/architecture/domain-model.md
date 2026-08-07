@@ -1114,6 +1114,34 @@ Potential goal types include:
 - Goals must remain distinguishable from budget allocations.
 - Archived goals must not disappear from historical reports.
 
+### Implementation: Goals Schema, Allocation Model, and Scope
+
+Implemented in `src/db/schema/goals.ts`, `src/domains/goals/`, `src/application/goals/{service.ts,goal-calculations.ts}`, `src/infrastructure/db/goals-repository.ts`, and `src/features/goals/actions.ts`.
+
+**Funding model — the ADR-0003 Goal Allocation Model is implemented.** `docs/adr/0003-goal-allocation-model.md` (Accepted) is the authoritative behavior: goal progress derives from a many-to-many goal↔account allocation ledger (`goal_allocations`), never from account balances directly, with "One Dollar May Only Be Allocated Once" enforced so that `sum(active allocations for an account) <= account.current_balance` always holds. That invariant is enforced twice, deliberately: `GoalService.allocateFunds`/`editAllocation` check it proactively (a friendly `ConflictError` in the common, sequential case), and the `goal_allocations_no_overallocation` database trigger (`BEFORE INSERT OR UPDATE`, `SELECT ... FOR UPDATE` row-locking the account) re-checks it authoritatively inside the write transaction — the trigger is what actually prevents two concurrent allocation writes from both succeeding past the balance; the service-level check alone cannot (see the two-connection race test in `src/infrastructure/db/goals-repository.test.ts`). `goal_contributions` (manual, user-reported activity) remains fully supported alongside allocations, not replaced by them — ADR-0003's formula, `Current Goal Value = Allocated Funds + Verified Contributions [+ Supported Asset Value, not yet implemented]`, is exactly what `computeGoalProgress` returns: `allocatedAmount + manualContributionsAmount = currentAmount`. The two ledgers are structurally disjoint (an allocation claims money that already, verifiably, sits in a real account; a contribution is money not tracked in any linked account), so they are summed, never merged or de-duplicated at read time — see `goal-calculations.ts`'s module comment for the full reasoning.
+
+Eligible funding-source account types (`ELIGIBLE_ALLOCATION_ACCOUNT_TYPES` in `service.ts`): `checking`, `savings`, `cash`, `investment`, `retirement`, `other-asset` (CDs have no dedicated `AccountType` in this codebase and are seeded as `other-asset`). Liability types and `property` (illiquid, no real "available balance") are never eligible. An account must also be `active` (not archived) and have a non-null `current_balance` to fund a goal.
+
+A goal's own optional `accountId`/`categoryId` (on the `goals` table itself) remain what they always were: an inert, single reference/display hint, entirely separate from the many-to-many funding relationship `goal_allocations` expresses — a goal can be "hinted" at one account while actually being funded by several others, or by none.
+
+**Lifecycle.** `status` is a single 4-value enum (`GoalStatus`: `active | paused | completed | archived`) rather than boolean flags — Active/Paused/Completed/Archived are mutually exclusive display states, so one enum makes that exclusivity structural. `completedAt` is set only by the explicit `completeGoal` transition (guarded by `currentAmount >= targetAmount`, the allocated+manual total; only reachable from `active`, so a paused goal must resume first), never automatically when funding happens to reach the target. Archiving (`archiveGoal`) never hard-deletes and never unwinds existing allocations/contributions — no DELETE grant exists on `goals`, `goal_contributions`, or `goal_allocations` at any layer; only *new* allocations/contributions are refused once a goal is archived or paused (`FUNDABLE_STATUSES` in `service.ts` — `active`/`completed` only). Pausing/resuming (`pauseGoal`/`resumeGoal`) touch only `status`; every existing contribution and allocation is left exactly as it was.
+
+```
+create → active ⇄ paused → completed
+   ↓        ↓        ↓          ↓
+   └──→ archived  archived  archived
+```
+
+**Priority** (`GoalPriority`: `high | medium | low`, default `medium`) is a plain editable field with no scoring or urgency formula attached — it is consumed only by ordering/selection logic (goal listing order, Upcoming Objective derivation below), never by progress, health, or completion.
+
+**Goal Health (deterministic, no forecasting).** `computeGoalHealth` in `goal-calculations.ts`: `status === "completed"` always overrides to `"completed"`. With a `targetDate`, actual `percentComplete` (allocated+manual) is compared against the percent of elapsed time (`expectedPercent`) with a ±10-point tolerance band (`excellent` / `on-track` / `behind`). Without a `targetDate`, flat thresholds apply (`>=75%` excellent, `25–75%` on-track, `<25%` behind). `projectedCompletionDate` is always `null` — there is no forecasting engine in this slice.
+
+**Upcoming Objective derivation** (`deriveUpcomingObjectives` in `goal-calculations.ts`, Issue #53) replaces the Dashboard's former bills-shaped `upcomingObjectives` mock with real, goal-derived entries computed from the exact same `GoalProgress[]` the rest of this domain's calculations already produce — never a second calculation path. Only `active` goals are eligible (paused/completed/archived never generate one). Each eligible goal is checked against four fixed rules, in order, first match wins: (1) funded ≥90% of target, (2) health is `behind`, (3) a target date falls within the next 60 days, (4) tagged `high` priority. That same order is the urgency rank used to sort and cap the final list at 4. No AI, scoring, or weighting formula — a deliberately simple, explainable rule set per the task's own constraint.
+
+**Contributions and allocations are both mutable, not insert-only audit logs.** Unlike `budget_allocation_adjustments` (an audit trail of changes to an ongoing mutable plan), a `goal_contributions`/`goal_allocations` row is itself the primary historical record of a funding event — closer to a Transaction than to an adjustment log. Edit and remove are real workflows on both (`updateGoalContribution`/`removeGoalContribution`, `editAllocation`/`removeAllocation`); "immutable history" is satisfied by never hard-deleting (soft-delete via `deletedAt`), not by refusing edits.
+
+**Out of scope**: automatic allocation rules (percent-of-paycheck, round-ups), Supported Asset Value (CD/investment appreciation attributed to a goal), goal forecasting, AI recommendations, milestones, Draft/Cancelled as distinct lifecycle states, and a dedicated Goals/Milestones/Contributions/History tab set (the Goals page's Overview tab covers the full implemented surface; the other tabs remain disabled placeholders, matching Budgets' equivalent disabled-tabs convention). See `docs/products/goals-specification.md` §12/§13 and `docs/financial-model/goals-model.md` §14.
+
 ---
 
 ## Reporting

@@ -5,6 +5,9 @@ import {
   budgetPeriods,
   categories,
   dataProviderConnections,
+  goalAllocations,
+  goalContributions,
+  goals,
   institutions,
   transactions,
 } from "../schema";
@@ -71,6 +74,9 @@ async function seed(): Promise<boolean> {
     devDataProviderConnections,
     devBudgetPeriods,
     devBudgetAllocations,
+    devGoals,
+    devGoalContributions,
+    devGoalAllocations,
   } = buildDevData(ownerId);
 
   await db.insert(institutions).values(devInstitutions).onConflictDoNothing();
@@ -96,6 +102,14 @@ async function seed(): Promise<boolean> {
   await db.insert(budgetPeriods).values(devBudgetPeriods).onConflictDoNothing();
   await db.insert(budgetAllocations).values(devBudgetAllocations).onConflictDoNothing();
   console.log(`Seeded ${devBudgetPeriods.length} budget period(s), ${devBudgetAllocations.length} allocation(s)`);
+
+  // Goals before contributions/allocations — both reference goalId.
+  await db.insert(goals).values(devGoals).onConflictDoNothing();
+  await db.insert(goalContributions).values(devGoalContributions).onConflictDoNothing();
+  await db.insert(goalAllocations).values(devGoalAllocations).onConflictDoNothing();
+  console.log(
+    `Seeded ${devGoals.length} goal(s), ${devGoalContributions.length} contribution(s), ${devGoalAllocations.length} allocation(s)`,
+  );
 
   return true;
 }

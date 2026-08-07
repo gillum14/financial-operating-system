@@ -6,19 +6,18 @@ import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 import { getBudgetsOverview } from "@/composition/budgets-query";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
+import { getGoalsOverview } from "@/composition/goals-query";
 import { getUserProfile } from "@/composition/user-profile";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
-import type { BudgetProgress } from "@/features/dashboard/types";
+import type { BudgetProgress, MissionProgressItem } from "@/features/dashboard/types";
 import {
   confidenceScore,
   confidenceTrends,
   dailyInsight,
   encouragementStatement,
-  missionProgress,
   missionStatus,
   operationalHighlights,
   priorityAction,
-  upcomingObjectives,
 } from "@/features/dashboard/mock-data";
 import { ConfidenceScoreCard } from "@/features/dashboard/components/confidence-score-card";
 import { FinancialBriefSummary } from "@/features/dashboard/components/financial-brief-summary";
@@ -68,11 +67,10 @@ export default async function DashboardPage() {
   const profile = await getUserProfile(authUser.id);
   const firstName = (profile?.displayName ?? authUser.email).split(" ")[0];
 
-  // Sections still sourced from mock data (Confidence Engine, Mission
-  // Engine, and objectives/recommendations aren't implemented yet — out
-  // of scope for this slice) are wired below unchanged; everything else,
-  // including Budget Status/Progress below, comes from real composition
-  // queries.
+  // Sections still sourced from mock data (Confidence Engine and Mission
+  // Status aren't implemented yet — out of scope for this slice) are wired
+  // below unchanged; everything else, including Budget Status/Progress and
+  // Upcoming Objectives below, comes from real composition queries.
   //
   // Recent Activity is a compact widget, not the full ledger — "View all"
   // is the entry point to the complete history. Uses DashboardService's
@@ -86,6 +84,20 @@ export default async function DashboardPage() {
   // are computed; the Dashboard never re-derives them from Transactions
   // independently, so the two pages can never silently disagree.
   const budgetOverview = await getBudgetsOverview(authUser.id);
+
+  // Same composition function the Goals page itself calls
+  // (getGoalsOverview) — the "Progress" widget below shows real,
+  // GoalService-derived percentages, never a second calculation of the
+  // same numbers. Only in-progress (active) goals are shown here —
+  // completed/archived goals aren't "something to make progress on"
+  // anymore — capped to the first 4 by display order, the same shape the
+  // former mock data had (2 example goals) but real and unbounded by a
+  // hardcoded list.
+  const goalsOverview = await getGoalsOverview(authUser.id);
+  const missionProgress: MissionProgressItem[] = (goalsOverview.goals ?? [])
+    .filter((goal) => goal.status === "active")
+    .slice(0, 4)
+    .map((goal) => ({ id: goal.id, label: goal.title, percent: Math.round(goal.percentCompleteDisplay) }));
   const budgetProgress: BudgetProgress | null =
     budgetOverview.hasBudget && budgetOverview.period && budgetOverview.metrics
       ? {
@@ -115,7 +127,13 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    // overflow-x-hidden + min-w-0: same containment boundary established
+    // on Transactions/Budgets/Goals — a wide descendant (e.g. a chart or
+    // stat grid) must never be able to inflate document.body.scrollWidth
+    // past the viewport on narrow screens. The Dashboard page predates
+    // that convention; applied here while verifying the new Goals-driven
+    // Progress widget's mobile rendering.
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <section className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-md">
           <p className="text-sm font-medium tracking-[0.16em] text-[var(--primary)] uppercase">Dashboard</p>
@@ -135,7 +153,7 @@ export default async function DashboardPage() {
             <span>{dailyInsight}</span>
           </p>
 
-          <MissionProgress missions={missionProgress} />
+          {missionProgress.length > 0 && <MissionProgress missions={missionProgress} />}
         </div>
 
         <div className="lg:max-w-xs lg:flex-1 lg:self-center">
@@ -208,7 +226,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <UpcomingObjectives objectives={upcomingObjectives} />
+          <UpcomingObjectives objectives={goalsOverview.upcomingObjectives ?? []} />
           <AccountsOverview accounts={snapshot.accounts} />
           <RecentActivity activity={snapshot.recentActivity} />
         </div>
