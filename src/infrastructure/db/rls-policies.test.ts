@@ -4,7 +4,17 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { DbClient } from "@/db/client";
-import { accounts, categories, dataProviderConnections, institutions, transactions, users } from "@/db/schema";
+import {
+  accounts,
+  budgetAllocationAdjustments,
+  budgetAllocations,
+  budgetPeriods,
+  categories,
+  dataProviderConnections,
+  institutions,
+  transactions,
+  users,
+} from "@/db/schema";
 
 import { runAsAuthenticatedUser } from "./test-support/run-as-authenticated-user";
 import { createTestDbClient, isDbTestingAllowed } from "./test-support/test-db-client";
@@ -569,6 +579,396 @@ describe.skipIf(!hasDatabase)("Row Level Security policies (integration)", () =>
     });
   });
 
+  describe("budget_periods", () => {
+    it("User A can read own budget periods but not User B's", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodA] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [periodB] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const own = await tx.select().from(budgetPeriods).where(eq(budgetPeriods.id, periodA.id));
+        const other = await tx.select().from(budgetPeriods).where(eq(budgetPeriods.id, periodB.id));
+
+        expect(own).toHaveLength(1);
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    it("User A can insert a budget period with owner_id = self", async () => {
+      await withRollback(db, async (tx) => {
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const [row] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        expect(row.ownerId).toBe(USER_A_ID);
+      });
+    });
+
+    it("User A cannot insert a budget period owned by User B", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.insert(budgetPeriods).values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" });
+        }),
+        /row-level security/,
+      );
+    });
+
+    it("User A cannot update User B's budget period", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodB] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const rows = await tx
+          .update(budgetPeriods)
+          .set({ status: "active" })
+          .where(eq(budgetPeriods.id, periodB.id))
+          .returning();
+        expect(rows).toHaveLength(0);
+      });
+    });
+
+    it("User A cannot reassign their own budget period to User B", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetPeriods).set({ ownerId: USER_B_ID }).where(eq(budgetPeriods.id, periodA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("User A cannot change period_start/period_end (only status is grantable)", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetPeriods).set({ periodEnd: "2026-09-30" }).where(eq(budgetPeriods.id, periodA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("matches the approved policy: no DELETE grant, so deletes are rejected outright", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.delete(budgetPeriods).where(eq(budgetPeriods.id, periodA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("the database enforces one active period per owner independent of application code", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31", status: "active" });
+          // A second active period for the same owner, inserted directly
+          // (bypassing BudgetService entirely) — the partial unique index
+          // (budget_periods_one_active_per_owner_idx) must still refuse
+          // it, proving this invariant doesn't rely solely on
+          // application-layer validation.
+          await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-09-01", periodEnd: "2026-09-30", status: "active" });
+        }),
+        /duplicate key value violates unique constraint/,
+      );
+    });
+  });
+
+  describe("budget_allocations", () => {
+    it("User A can read own allocations but not User B's", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodA] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+        const [allocationA] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+          .returning();
+
+        const [periodB] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryB] = await tx.insert(categories).values({ ownerId: USER_B_ID, name: "Groceries" }).returning();
+        const [allocationB] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_B_ID, budgetPeriodId: periodB.id, categoryId: categoryB.id, plannedAmount: "500.00" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const own = await tx.select().from(budgetAllocations).where(eq(budgetAllocations.id, allocationA.id));
+        const other = await tx.select().from(budgetAllocations).where(eq(budgetAllocations.id, allocationB.id));
+
+        expect(own).toHaveLength(1);
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    it("User A can insert an allocation with owner_id = self", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodA] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const [row] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+          .returning();
+        expect(row.ownerId).toBe(USER_A_ID);
+      });
+    });
+
+    it("User A cannot insert an allocation owned by User B", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodB] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryB] = await tx.insert(categories).values({ ownerId: USER_B_ID, name: "Groceries" }).returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_B_ID, budgetPeriodId: periodB.id, categoryId: categoryB.id, plannedAmount: "500.00" });
+        }),
+        /row-level security/,
+      );
+    });
+
+    it("User A cannot update User B's allocation", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodB] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryB] = await tx.insert(categories).values({ ownerId: USER_B_ID, name: "Groceries" }).returning();
+        const [allocationB] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_B_ID, budgetPeriodId: periodB.id, categoryId: categoryB.id, plannedAmount: "500.00" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const rows = await tx
+          .update(budgetAllocations)
+          .set({ plannedAmount: "1.00" })
+          .where(eq(budgetAllocations.id, allocationB.id))
+          .returning();
+        expect(rows).toHaveLength(0);
+      });
+    });
+
+    it("User A cannot reassign their own allocation to User B", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetAllocations).set({ ownerId: USER_B_ID }).where(eq(budgetAllocations.id, allocationA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("User A cannot change category_id or budget_period_id (only planned_amount/display_order are grantable)", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetAllocations).set({ categoryId: randomUUID() }).where(eq(budgetAllocations.id, allocationA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("matches the approved policy: no DELETE grant, so deletes are rejected outright", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.delete(budgetAllocations).where(eq(budgetAllocations.id, allocationA.id));
+        }),
+        /permission denied/,
+      );
+    });
+  });
+
+  describe("budget_allocation_adjustments", () => {
+    it("User A can read own adjustments but not User B's", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodA] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+        const [allocationA] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+          .returning();
+        const [adjustmentA] = await tx
+          .insert(budgetAllocationAdjustments)
+          .values({ ownerId: USER_A_ID, budgetAllocationId: allocationA.id, previousAmount: "500.00", newAmount: "600.00" })
+          .returning();
+
+        const [periodB] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_B_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryB] = await tx.insert(categories).values({ ownerId: USER_B_ID, name: "Groceries" }).returning();
+        const [allocationB] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_B_ID, budgetPeriodId: periodB.id, categoryId: categoryB.id, plannedAmount: "500.00" })
+          .returning();
+        const [adjustmentB] = await tx
+          .insert(budgetAllocationAdjustments)
+          .values({ ownerId: USER_B_ID, budgetAllocationId: allocationB.id, previousAmount: "500.00", newAmount: "600.00" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const own = await tx
+          .select()
+          .from(budgetAllocationAdjustments)
+          .where(eq(budgetAllocationAdjustments.id, adjustmentA.id));
+        const other = await tx
+          .select()
+          .from(budgetAllocationAdjustments)
+          .where(eq(budgetAllocationAdjustments.id, adjustmentB.id));
+
+        expect(own).toHaveLength(1);
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    it("User A can insert an adjustment with owner_id = self", async () => {
+      await withRollback(db, async (tx) => {
+        const [periodA] = await tx
+          .insert(budgetPeriods)
+          .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+          .returning();
+        const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+        const [allocationA] = await tx
+          .insert(budgetAllocations)
+          .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const [row] = await tx
+          .insert(budgetAllocationAdjustments)
+          .values({ ownerId: USER_A_ID, budgetAllocationId: allocationA.id, previousAmount: "500.00", newAmount: "600.00" })
+          .returning();
+        expect(row.ownerId).toBe(USER_A_ID);
+      });
+    });
+
+    it("User A cannot update an adjustment — no UPDATE grant at all, even on their own row", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+          const [adjustmentA] = await tx
+            .insert(budgetAllocationAdjustments)
+            .values({ ownerId: USER_A_ID, budgetAllocationId: allocationA.id, previousAmount: "500.00", newAmount: "600.00" })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx
+            .update(budgetAllocationAdjustments)
+            .set({ newAmount: "9999.00" })
+            .where(eq(budgetAllocationAdjustments.id, adjustmentA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("matches the approved policy: no DELETE grant, so deletes are rejected outright", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+          const [adjustmentA] = await tx
+            .insert(budgetAllocationAdjustments)
+            .values({ ownerId: USER_A_ID, budgetAllocationId: allocationA.id, previousAmount: "500.00", newAmount: "600.00" })
+            .returning();
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.delete(budgetAllocationAdjustments).where(eq(budgetAllocationAdjustments.id, adjustmentA.id));
+        }),
+        /permission denied/,
+      );
+    });
+  });
+
   // 0004_harden_owned_table_update_grants.sql: column-level UPDATE grants
   // reinforce the RLS WITH CHECK at a level RLS can't reach (row-scoped,
   // not column-scoped) — id/owner_id/created_at/updated_at/deleted_at are
@@ -644,6 +1044,39 @@ describe.skipIf(!hasDatabase)("Row Level Security policies (integration)", () =>
             .returning();
           await runAsAuthenticatedUser(tx, USER_A_ID);
           await tx.update(dataProviderConnections).set({ deletedAt: new Date() }).where(eq(dataProviderConnections.id, connA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("User A cannot update budget_periods.id or .deleted_at even on their own row", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetPeriods).set({ deletedAt: new Date() }).where(eq(budgetPeriods.id, periodA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("User A cannot update budget_allocations.id or .deleted_at even on their own row", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [periodA] = await tx
+            .insert(budgetPeriods)
+            .values({ ownerId: USER_A_ID, periodStart: "2026-08-01", periodEnd: "2026-08-31" })
+            .returning();
+          const [categoryA] = await tx.insert(categories).values({ ownerId: USER_A_ID, name: "Groceries" }).returning();
+          const [allocationA] = await tx
+            .insert(budgetAllocations)
+            .values({ ownerId: USER_A_ID, budgetPeriodId: periodA.id, categoryId: categoryA.id, plannedAmount: "500.00" })
+            .returning();
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(budgetAllocations).set({ deletedAt: new Date() }).where(eq(budgetAllocations.id, allocationA.id));
         }),
         /permission denied/,
       );

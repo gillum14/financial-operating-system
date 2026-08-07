@@ -1,13 +1,37 @@
 import { RailCard } from "@/components/ui/rail-card";
 
-// TECH DEBT: "on track" status is computed per-category against a budget
-// period's allocation — no Budget domain exists yet, so there's nothing to
-// classify. No donut/chart invented for a status that doesn't exist.
-export function OnTrackCard() {
+export function OnTrackCard({
+  onTrack,
+}: {
+  onTrack?: { onTrackCount: number; overspentCount: number; totalCount: number };
+}) {
+  if (!onTrack || onTrack.totalCount === 0) {
+    return (
+      <RailCard title="On Track">
+        <p className="text-sm text-[var(--foreground-secondary)]">Category tracking isn&apos;t available yet.</p>
+        <p className="mt-1 text-xs text-[var(--foreground-muted)]">This will appear once a budget exists.</p>
+      </RailCard>
+    );
+  }
+
+  const { onTrackCount, overspentCount, totalCount } = onTrack;
+
   return (
     <RailCard title="On Track">
-      <p className="text-sm text-[var(--foreground-secondary)]">Category tracking isn&apos;t available yet.</p>
-      <p className="mt-1 text-xs text-[var(--foreground-muted)]">This will appear once a budget exists.</p>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-[var(--foreground-secondary)]">On track</span>
+        <span className="font-medium text-[var(--success)]">
+          {onTrackCount} of {totalCount}
+        </span>
+      </div>
+      {overspentCount > 0 ? (
+        <div className="mt-2 flex items-center justify-between text-sm">
+          <span className="text-[var(--foreground-secondary)]">Overspent</span>
+          <span className="font-medium text-[var(--danger)]">{overspentCount}</span>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-[var(--foreground-muted)]">No categories are overspent right now.</p>
+      )}
     </RailCard>
   );
 }

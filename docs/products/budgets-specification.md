@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** August 03, 2026
+**Last Updated:** August 06, 2026
 
 ---
 
@@ -481,8 +481,21 @@ Transactions own financial activity.
 
 ---
 
+## Historical Preservation
+
+V1 preserves budget history at the entity level: Budget Period, Budget Category, and Budget Adjustment records are retained rather than deleted or overwritten once a period closes, satisfying the "historical records" requirement in §5 and §6.
+
+A Completed period's Planned, Spent, Remaining, and Overspending figures (§8, §9) are currently recomputed from authoritative Transactions each time they're viewed, not read from a separately stored point-in-time record.
+
+Immutable Budget Snapshots — a frozen, versioned record of a closed period's totals — are deferred to a future version. They become required once Athena permits historical transaction changes that could materially rewrite a closed budget's already-reported results, or once reporting or performance needs justify them. See docs/financial-model/budgets-model.md §11 for the full technical rationale.
+
+This is an explicit V1 product and architecture decision, not accidental technical debt.
+
+---
+
 # 24. Revision History
 
 | Version | Date       | Author         | Summary                                                                                                                                                                                                                                                                                  |
 | ------- | ---------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-03 | Caitlin Gillum | Established the Budgets product specification defining Athena's zero-based budgeting philosophy, budget lifecycle, planning model, category management, adjustments, overspending, rollovers, household budgeting, domain relationships, user experience principles, and future roadmap. |
+| 1.1.0   | 2026-08-06 | Caitlin Gillum | Added a "Historical Preservation" product decision (§23) clarifying that V1 preserves budget history via retained Period/Category/Adjustment records and live recomputation from Transactions, and that immutable Budget Snapshots are an explicit, deliberately deferred V1 decision — not accidental technical debt. See docs/financial-model/budgets-model.md v1.1.0 for the corresponding technical clarification. |

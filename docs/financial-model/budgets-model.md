@@ -4,7 +4,7 @@
 
 **Internal Codename:** Athena
 
-**Document Version:** 1.0.0
+**Document Version:** 1.1.0
 
 **Status:** Draft
 
@@ -14,7 +14,7 @@
 
 **Technical Advisor:** OpenAI ChatGPT
 
-**Last Updated:** August 03, 2026
+**Last Updated:** August 06, 2026
 
 ---
 
@@ -59,7 +59,7 @@ The Budgets domain owns:
 - Planned allocations
 - Budget adjustments
 - Budget health
-- Historical budget snapshots
+- Historical budget snapshots (deferred to a future version — see §11)
 
 It does **not** own spending activity.
 
@@ -122,7 +122,7 @@ The Budgets domain consists of:
 - Budget Adjustment
 - Budget Health
 - Budget Template
-- Budget Snapshot
+- Budget Snapshot (deferred — see §11)
 
 ---
 
@@ -281,6 +281,8 @@ Templates never contain transaction data.
 
 # 11. Budget Snapshot
 
+**V1 status: deferred.** Budget Snapshots, as described below, are not implemented in V1. This section documents the target design for a future version, and the paragraphs at the end of this section describe what V1 does instead and why that is a deliberate decision rather than an oversight.
+
 Budget Snapshots preserve historical budget performance.
 
 Each snapshot may contain:
@@ -298,6 +300,24 @@ Each snapshot may contain:
 Snapshots are immutable.
 
 Historical reporting references snapshots rather than recalculating prior periods.
+
+## V1 Behavior (No Snapshots)
+
+V1 preserves history at the entity level instead of the snapshot level:
+
+- Budget Period, Budget Allocation, and Budget Adjustment rows are never hard-deleted. A Completed or Archived period's allocations remain exactly as they were when the period closed — see §12 Budget Lifecycle and §20 Safety and Validation Rules.
+- Budget Adjustments already give every planning change (including changes made before a period closed) a permanent, timestamped, immutable record — this is real historical preservation, just not a full point-in-time snapshot of computed totals.
+- A Completed period's Planned, Actual, Remaining, Variance, Utilization, and Overspending figures are **recomputed live** from the same Budget Calculations (§13) applied to the period's Budget Allocations and the authoritative Transactions falling within its date range — not read from a frozen snapshot, because no snapshot exists yet.
+- This is safe today because Transactions are themselves treated as an immutable historical record in normal operation (§15) — a completed period's date range doesn't change, and the transactions inside it aren't expected to change either, so live recomputation and a hypothetical frozen snapshot would produce the same result.
+
+## Why Snapshots Are Deferred, Not Skipped
+
+Immutable Budget Snapshots become a **required** addition — not merely a nice-to-have — under either of these conditions:
+
+1. **Historical transaction mutability.** If Athena ever permits editing, re-categorizing, or deleting a Transaction whose date falls inside a Completed or Archived Budget Period in a way that could materially change that period's already-reported totals, snapshots (or an equivalent frozen record) become necessary to keep a closed period's reported results from silently shifting underneath the user. V1 does not need this guarantee because it does not yet expose that kind of retroactive transaction edit against closed-period history.
+2. **Reporting or performance requirements.** If Reports (§17) or another downstream consumer needs fast historical aggregation across many closed periods without recomputing each one from raw Transactions on every read, or needs a stable point-in-time record independent of any future recalculation-logic change, snapshots become the correct mechanism.
+
+Until one of those conditions applies, adding a snapshot table would be storing a second, cache-like copy of a value V1 can already compute correctly and cheaply on demand — the kind of premature abstraction this codebase's own engineering principles avoid. This is an explicit V1 product and architecture decision, not accidental technical debt left behind.
 
 ---
 
@@ -430,7 +450,7 @@ Reports consume:
 - Planned amounts
 - Actual spending
 - Variance
-- Historical snapshots
+- Historical snapshots (once implemented — see §11; in V1, Reports would consume the same live-recomputed figures the Budgets domain itself uses, since no snapshot exists yet)
 
 Reports never own budgets.
 
@@ -468,7 +488,7 @@ The Budgets model should enforce:
 - One active budget period per schedule
 - Canonical category references
 - Deterministic calculations
-- Immutable historical snapshots
+- Immutable historical snapshots (applies once Budget Snapshots exist — see §11; in V1, with no snapshot table, the equivalent guarantee is that Budget Period, Allocation, and Adjustment rows are never hard-deleted or rewritten after the fact)
 - Explicit adjustments
 - Valid lifecycle state
 - Budget totals that reconcile
@@ -478,7 +498,7 @@ Athena must never:
 - Fabricate spending
 - Rewrite transaction history
 - Lose adjustment history
-- Recalculate historical snapshots
+- Recalculate historical snapshots **once a snapshot has been taken** (§11) — this does not prohibit V1's live recomputation of a Completed period's totals from Transactions, since no snapshot exists in V1 to recalculate. Recomputing a live figure from an unmodified, authoritative source is not the same as rewriting a previously recorded one.
 - Allow orphaned budget categories
 
 Unknown states should fail safely.
@@ -509,3 +529,4 @@ Future capabilities may include:
 | Version | Date       | Author         | Summary                                                                                                                                                                                                                                                             |
 | ------- | ---------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-03 | Caitlin Gillum | Established the canonical Budgets domain model defining budgets, planning periods, allocations, categories, adjustments, health evaluation, templates, snapshots, deterministic calculations, downstream relationships, validation rules, and future extensibility. |
+| 1.1.0   | 2026-08-06 | Caitlin Gillum | Resolved documentation drift discovered while closing the Budgets Backend V1 slice: explicitly marked Budget Snapshots (§11) as deferred to a future version rather than implemented, documented V1's actual behavior of preserving history via immutable Budget Period/Allocation/Adjustment rows and live-recomputing Completed-period totals from Transactions, defined the two conditions (historical transaction mutability; reporting/performance need) under which snapshots become required, qualified §20's "never recalculate historical snapshots" rule so it no longer contradicts V1's correct live-recomputation behavior, and clarified §17's Reports relationship for the no-snapshot case. No entities, calculations, or lifecycle rules changed — clarification only. |

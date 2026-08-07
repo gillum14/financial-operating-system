@@ -125,6 +125,15 @@ export function categoryGroups(ownerId: string): CategoryGroup[] {
         { id: id("category:financial:bank-fees"), name: "Bank Fees" },
         { id: id("category:financial:credit-card-interest"), name: "Credit Card Interest" },
         { id: id("category:financial:legal-and-tax"), name: "Legal & Tax" },
+        // A budget-allocation target with no matching transaction rows by
+        // design — actual saving/investing happens via transfers (see
+        // fixtures/transactions/transfers.ts), which are never assigned a
+        // categoryId (budgets-model.md: "internal transfers must not count
+        // as spending"). Allocating planned dollars here demonstrates
+        // zero-based budgeting's "savings and investments are valid
+        // allocations" rule (budgets-specification.md §4) without
+        // fabricating a spending transaction that doesn't exist.
+        { id: id("category:financial:savings-contributions"), name: "Savings Contributions" },
       ],
     },
   ];

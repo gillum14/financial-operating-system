@@ -21,20 +21,21 @@ export const dynamic = "force-dynamic";
 // Transactions' RailCards. Budget Period is first, so it lands directly
 // beneath Overall Progress (the last full-width metric tile) in the
 // approved layout.
-function RailCards() {
+function RailCards({ overview }: { overview: Awaited<ReturnType<typeof getBudgetsOverview>> }) {
   return (
     <>
-      <BudgetPeriodCard />
-      <BudgetSummaryCard />
-      <OnTrackCard />
-      <RecentAdjustmentsCard />
+      <BudgetPeriodCard currentPeriodId={overview.period?.id} periods={overview.availablePeriods} />
+      <BudgetSummaryCard metrics={overview.metrics} />
+      <OnTrackCard onTrack={overview.onTrack} />
+      <RecentAdjustmentsCard adjustments={overview.recentAdjustments} />
     </>
   );
 }
 
-export default async function BudgetsPage() {
+export default async function BudgetsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const authUser = await requireAuthenticatedUser();
-  const overview = await getBudgetsOverview(authUser.id);
+  const { period } = await searchParams;
+  const overview = await getBudgetsOverview(authUser.id, period);
 
   return (
     // overflow-x-hidden + min-w-0: same containment boundary established
@@ -52,7 +53,7 @@ export default async function BudgetsPage() {
           the full content area. */}
       <BudgetsTabs>
         <div className="space-y-6">
-          <BudgetOverviewMetrics hasBudget={overview.hasBudget} />
+          <BudgetOverviewMetrics hasBudget={overview.hasBudget} metrics={overview.metrics} />
 
           {/* Two-column shape starts here: main workspace + a narrow
               utility rail as a true grid sibling, not a stack that only
@@ -61,14 +62,20 @@ export default async function BudgetsPage() {
               behavior across both pages. */}
           <div className={`${RAIL_GRID_COLS} items-start`}>
             <div className="min-w-0">
-              <BudgetByCategoryCard hasBudget={overview.hasBudget} />
+              <BudgetByCategoryCard
+                hasBudget={overview.hasBudget}
+                budgetPeriodId={overview.period?.id}
+                categories={overview.categories}
+                editable={overview.period?.isEditable}
+                allocatableCategories={overview.allocatableCategories}
+              />
             </div>
 
             {/* True grid sibling of the workspace column above, visible
                 only at the desktop threshold — this is what makes the
                 rail sit beside the workspace rather than below it. */}
             <aside className="hidden space-y-4 min-[1360px]:block">
-              <RailCards />
+              <RailCards overview={overview} />
             </aside>
           </div>
 
@@ -76,7 +83,7 @@ export default async function BudgetsPage() {
               and <aside> is hidden — this is the stacked-below rendering
               of the same 4 cards, shown only at those narrower widths. */}
           <div className="space-y-4 min-[1360px]:hidden">
-            <RailCards />
+            <RailCards overview={overview} />
           </div>
         </div>
       </BudgetsTabs>

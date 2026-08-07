@@ -1,5 +1,13 @@
 import { db, queryClient } from "../client";
-import { accounts, categories, dataProviderConnections, institutions, transactions } from "../schema";
+import {
+  accounts,
+  budgetAllocations,
+  budgetPeriods,
+  categories,
+  dataProviderConnections,
+  institutions,
+  transactions,
+} from "../schema";
 import { buildDevData } from "./data";
 
 // Chunked rather than one INSERT with 1000+ VALUES rows — comfortably
@@ -61,6 +69,8 @@ async function seed(): Promise<boolean> {
     devAccounts,
     devTransactions,
     devDataProviderConnections,
+    devBudgetPeriods,
+    devBudgetAllocations,
   } = buildDevData(ownerId);
 
   await db.insert(institutions).values(devInstitutions).onConflictDoNothing();
@@ -81,6 +91,11 @@ async function seed(): Promise<boolean> {
 
   await db.insert(dataProviderConnections).values(devDataProviderConnections).onConflictDoNothing();
   console.log(`Seeded ${devDataProviderConnections.length} data provider connection(s)`);
+
+  // Periods before allocations — allocations reference budgetPeriodId.
+  await db.insert(budgetPeriods).values(devBudgetPeriods).onConflictDoNothing();
+  await db.insert(budgetAllocations).values(devBudgetAllocations).onConflictDoNothing();
+  console.log(`Seeded ${devBudgetPeriods.length} budget period(s), ${devBudgetAllocations.length} allocation(s)`);
 
   return true;
 }
