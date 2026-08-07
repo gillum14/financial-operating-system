@@ -2,6 +2,8 @@ import { accountFixtures } from "./fixtures/accounts";
 import { budgetAllocationFixtures, budgetPeriodFixtures } from "./fixtures/budgets";
 import { categoryChildFixtures, categoryParentFixtures } from "./fixtures/categories";
 import { connectionFixtures } from "./fixtures/connections";
+import { goalAllocationFixtures } from "./fixtures/goal-allocations";
+import { goalContributionFixtures, goalFixtures } from "./fixtures/goals";
 import { institutionFixtures } from "./fixtures/institutions";
 import { buildTransactions } from "./fixtures/transactions";
 
@@ -25,6 +27,9 @@ export function buildDevData(ownerId: string) {
     devDataProviderConnections: connectionFixtures(ownerId),
     devBudgetPeriods: budgetPeriodFixtures(ownerId),
     devBudgetAllocations: budgetAllocationFixtures(ownerId),
+    devGoals: goalFixtures(ownerId),
+    devGoalContributions: goalContributionFixtures(ownerId),
+    devGoalAllocations: goalAllocationFixtures(ownerId),
   };
 }
 
@@ -36,6 +41,7 @@ export function buildDevData(ownerId: string) {
 export { accountIds, type AccountIds } from "./fixtures/accounts";
 export { categoryGroups, categoryIdByName } from "./fixtures/categories";
 export { connectionIds, type ConnectionIds } from "./fixtures/connections";
+export { goalIds, type GoalIds } from "./fixtures/goals";
 // Institutions are the one genuinely global, unscoped table — every owner
 // shares the same three rows, so these stay bare constants.
 export { INSTITUTION_CASCADE_ID, INSTITUTION_HARBOR_ID, INSTITUTION_MERIDIAN_ID } from "./fixtures/institutions";

@@ -1,62 +1,56 @@
-import { Home, Landmark, ShieldCheck, Zap, type LucideIcon } from "lucide-react";
+import { Target } from "lucide-react";
 
+import type { UpcomingObjectiveRow } from "@/application/goals/goals-views";
 import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
-import type { UpcomingObjective } from "@/features/dashboard/types";
 
-const OBJECTIVE_ICON: Record<string, LucideIcon> = {
-  mortgage: Home,
-  "car-insurance": ShieldCheck,
-  electric: Zap,
-  salary: Landmark,
-};
+// Goal-derived objectives (Issue #53) — see
+// goal-calculations.ts's deriveUpcomingObjectives, the single canonical
+// source both this widget and the Goals page itself would use. Each row is
+// a real, active goal selected by a fixed, explainable rule (near
+// completion, behind pace, an approaching target date, or a high-priority
+// tag), never a fabricated or AI-generated suggestion.
+export function UpcomingObjectives({ objectives }: { objectives: UpcomingObjectiveRow[] }) {
+  if (objectives.length === 0) {
+    return (
+      <Card>
+        <CardHeader title="Upcoming Objectives" />
+        <p className="text-sm text-[var(--foreground-secondary)]">
+          No goals currently need attention — nothing is behind pace, nearly funded, or approaching its target date.
+        </p>
+      </Card>
+    );
+  }
 
-function formatAmount(amount: number) {
-  const sign = amount < 0 ? "-" : "+";
-  const formatted = Math.abs(amount).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${sign}$${formatted}`;
-}
-
-export function UpcomingObjectives({ objectives }: { objectives: UpcomingObjective[] }) {
   return (
     <Card>
       <CardHeader title="Upcoming Objectives">
-        <a href="#" className="text-sm font-medium text-[var(--primary)] hover:underline">
+        <a href="/goals" className="text-sm font-medium text-[var(--primary)] hover:underline">
           View all
         </a>
       </CardHeader>
 
       <ul className="space-y-4">
-        {objectives.map((objective) => {
-          const Icon = OBJECTIVE_ICON[objective.id] ?? Landmark;
-          const tone = objective.amount < 0 ? "var(--warning)" : "var(--success)";
+        {objectives.map((objective) => (
+          <li key={objective.goalId} className="flex items-center gap-3">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[calc(var(--radius)-8px)]"
+              style={{ backgroundColor: "color-mix(in srgb, var(--primary) 15%, transparent)", color: "var(--primary)" }}
+            >
+              <Target className="h-4 w-4" strokeWidth={1.75} />
+            </span>
 
-          return (
-            <li key={objective.id} className="flex items-center gap-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[calc(var(--radius)-8px)]"
-                style={{ backgroundColor: `color-mix(in srgb, ${tone} 15%, transparent)`, color: tone }}
-              >
-                <Icon className="h-4 w-4" strokeWidth={1.75} />
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[var(--foreground)]">{objective.title}</p>
+              <p className="truncate text-xs text-[var(--foreground-muted)]">{objective.reason}</p>
+            </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[var(--foreground)]">{objective.title}</p>
-                <p className="truncate text-xs text-[var(--foreground-muted)]">{objective.subtitle}</p>
-              </div>
-
-              <div className="shrink-0 text-right">
-                <p className="text-xs text-[var(--foreground-muted)]">{objective.dueDate}</p>
-                <p className="mt-1 text-sm font-medium" style={{ color: tone }}>
-                  {formatAmount(objective.amount)}
-                </p>
-              </div>
-            </li>
-          );
-        })}
+            <div className="shrink-0 text-right">
+              <p className="text-sm font-medium text-[var(--foreground)]">{Math.round(objective.percentCompleteDisplay)}%</p>
+              <p className="mt-1 text-xs text-[var(--foreground-muted)]">funded</p>
+            </div>
+          </li>
+        ))}
       </ul>
     </Card>
   );

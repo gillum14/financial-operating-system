@@ -5,10 +5,8 @@ import type {
   CategorySpend,
   ConfidenceScore,
   ConfidenceTrend,
-  MissionProgressItem,
   MissionStatusItem,
   StatSummary,
-  UpcomingObjective,
 } from "./types";
 
 export const briefDate = {
@@ -58,37 +56,6 @@ export const cashFlowPeriod = {
   expenses: 6620,
   netCashFlow: 3240,
 };
-
-export const upcomingObjectives: UpcomingObjective[] = [
-  {
-    id: "mortgage",
-    title: "Mortgage Payment",
-    subtitle: "Chase Mortgage",
-    dueDate: "Jun 1, 2026",
-    amount: -2348.0,
-  },
-  {
-    id: "car-insurance",
-    title: "Car Insurance",
-    subtitle: "Progressive",
-    dueDate: "Jun 5, 2026",
-    amount: -182.47,
-  },
-  {
-    id: "electric",
-    title: "Electric Bill",
-    subtitle: "TXU Energy",
-    dueDate: "Jun 7, 2026",
-    amount: -156.89,
-  },
-  {
-    id: "salary",
-    title: "Salary Deposit",
-    subtitle: "Employer",
-    dueDate: "Jun 10, 2026",
-    amount: 4250.0,
-  },
-];
 
 export const accounts: Account[] = [
   {
@@ -178,11 +145,6 @@ export const confidenceTrends: ConfidenceTrend[] = [
 export const encouragementStatement = "You're making strong progress toward your financial goals.";
 
 export const dailyInsight = "Investments continue trending upward, up 2.23% this month.";
-
-export const missionProgress: MissionProgressItem[] = [
-  { id: "emergency-fund", label: "Emergency Fund", percent: 72 },
-  { id: "vacation-fund", label: "Vacation Fund", percent: 48 },
-];
 
 export const operationalHighlights: string[] = [
   "Cash flow is positive — $3,240 net for May, up 21.9%.",

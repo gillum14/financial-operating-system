@@ -16,14 +16,6 @@ export interface ActivityItem {
   category: string;
 }
 
-export interface UpcomingObjective {
-  id: string;
-  title: string;
-  subtitle: string;
-  dueDate: string;
-  amount: number;
-}
-
 export interface CategorySpend {
   category: string;
   amount: number;

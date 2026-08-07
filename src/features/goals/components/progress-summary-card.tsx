@@ -1,14 +1,36 @@
+import type { GoalHealthSummary } from "@/application/goals/goals-views";
 import { RailCard } from "@/components/ui/rail-card";
+import { goalHealthTone } from "@/lib/goal-presentation";
 
-// TECH DEBT: "on track / behind / at risk" status is computed per-goal
-// against its target date and target amount — no Goals domain exists yet,
-// so there's nothing to classify. No donut/chart invented for a status
-// that doesn't exist (same reasoning as Budgets' OnTrackCard).
-export function ProgressSummaryCard() {
+const ROWS: { key: keyof GoalHealthSummary; label: string; health: "excellent" | "on-track" | "behind" | "completed" }[] = [
+  { key: "excellent", label: "Excellent", health: "excellent" },
+  { key: "onTrack", label: "On Track", health: "on-track" },
+  { key: "behind", label: "Behind", health: "behind" },
+  { key: "completed", label: "Completed", health: "completed" },
+];
+
+export function ProgressSummaryCard({ healthSummary }: { healthSummary?: GoalHealthSummary }) {
+  if (!healthSummary) {
+    return (
+      <RailCard title="Progress Summary">
+        <p className="text-sm text-[var(--foreground-secondary)]">Progress tracking isn&apos;t available yet.</p>
+        <p className="mt-1 text-xs text-[var(--foreground-muted)]">This will appear once goals exist.</p>
+      </RailCard>
+    );
+  }
+
   return (
     <RailCard title="Progress Summary">
-      <p className="text-sm text-[var(--foreground-secondary)]">Progress tracking isn&apos;t available yet.</p>
-      <p className="mt-1 text-xs text-[var(--foreground-muted)]">This will appear once goals exist.</p>
+      <dl className="space-y-2.5 text-sm">
+        {ROWS.map((row) => (
+          <div key={row.key} className="flex items-center justify-between">
+            <dt className="text-[var(--foreground-secondary)]">{row.label}</dt>
+            <dd className="font-medium" style={{ color: goalHealthTone(row.health) }}>
+              {healthSummary[row.key]}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </RailCard>
   );
 }

@@ -27,6 +27,19 @@ import type {
   DataProviderConnectionUpdateInput,
 } from "@/domains/data-provider-connections/types";
 import { NotFoundError } from "@/domains/errors";
+import type { GoalAllocationRepository, GoalContributionRepository, GoalRepository } from "@/domains/goals/repository";
+import type {
+  Goal,
+  GoalAllocation,
+  GoalAllocationCreateInput,
+  GoalAllocationUpdateInput,
+  GoalContribution,
+  GoalContributionCreateInput,
+  GoalContributionUpdateInput,
+  GoalCreateInput,
+  GoalStatusUpdateInput,
+  GoalUpdateInput,
+} from "@/domains/goals/types";
 import type { InstitutionRepository } from "@/domains/institutions/repository";
 import type { Institution, InstitutionCreateInput, InstitutionUpdateInput } from "@/domains/institutions/types";
 import type { TransactionRepository } from "@/domains/transactions/repository";
@@ -471,6 +484,174 @@ export class FakeBudgetAllocationAdjustmentRepository implements BudgetAllocatio
     };
     this.rows.push(row);
     return row;
+  }
+}
+
+export class FakeGoalRepository implements GoalRepository {
+  private readonly rows = new Map<string, Goal>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<Goal | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
+  }
+
+  async listForOwner(ownerId: string): Promise<Goal[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId && !row.deletedAt)
+      .sort((a, b) => (a.displayOrder !== b.displayOrder ? a.displayOrder - b.displayOrder : a.createdAt.getTime() - b.createdAt.getTime()));
+  }
+
+  async create(input: GoalCreateInput & { displayOrder: number }): Promise<Goal> {
+    const now = new Date();
+    const row: Goal = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      categoryId: input.categoryId ?? null,
+      accountId: input.accountId ?? null,
+      title: input.title,
+      description: input.description ?? null,
+      targetAmount: input.targetAmount,
+      targetDate: input.targetDate ?? null,
+      goalType: input.goalType,
+      status: "active",
+      priority: input.priority ?? "medium",
+      icon: input.icon ?? null,
+      color: input.color ?? null,
+      displayOrder: input.displayOrder,
+      completedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async update(id: string, ownerId: string, changes: GoalUpdateInput): Promise<Goal> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async updateStatus(id: string, ownerId: string, changes: GoalStatusUpdateInput): Promise<Goal> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, completedAt: changes.completedAt ?? row.completedAt, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async softDelete(id: string, ownerId: string): Promise<void> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+}
+
+export class FakeGoalContributionRepository implements GoalContributionRepository {
+  private readonly rows = new Map<string, GoalContribution>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<GoalContribution | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
+  }
+
+  async listForOwnerAndGoals(ownerId: string, goalIds: string[]): Promise<GoalContribution[]> {
+    const idSet = new Set(goalIds);
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId && idSet.has(row.goalId) && !row.deletedAt)
+      .sort((a, b) => (a.contributionDate === b.contributionDate ? 0 : a.contributionDate < b.contributionDate ? 1 : -1));
+  }
+
+  async create(input: GoalContributionCreateInput): Promise<GoalContribution> {
+    const now = new Date();
+    const row: GoalContribution = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      goalId: input.goalId,
+      amount: input.amount,
+      contributionDate: input.contributionDate,
+      note: input.note ?? null,
+      source: input.source ?? "manual",
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async update(id: string, ownerId: string, changes: GoalContributionUpdateInput): Promise<GoalContribution> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal contribution ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async softDelete(id: string, ownerId: string): Promise<void> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal contribution ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+}
+
+// Plain CRUD only — no overallocation enforcement here. GoalService's own
+// proactive check (assertWithinAvailableBalance) is what unit tests
+// against this fake exercise; the real, concurrency-safe enforcement is
+// the goal_allocations_no_overallocation database trigger, which only a
+// real Postgres connection can meaningfully test (see the DB-backed
+// concurrency test in infrastructure/db/goals-repository.test.ts).
+export class FakeGoalAllocationRepository implements GoalAllocationRepository {
+  private readonly rows = new Map<string, GoalAllocation>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<GoalAllocation | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
+  }
+
+  async listForOwnerAndGoals(ownerId: string, goalIds: string[]): Promise<GoalAllocation[]> {
+    const idSet = new Set(goalIds);
+    return [...this.rows.values()].filter((row) => row.ownerId === ownerId && idSet.has(row.goalId) && !row.deletedAt);
+  }
+
+  async listForOwnerAndAccounts(ownerId: string, accountIds: string[]): Promise<GoalAllocation[]> {
+    const idSet = new Set(accountIds);
+    return [...this.rows.values()].filter(
+      (row) => row.ownerId === ownerId && idSet.has(row.accountId) && !row.deletedAt,
+    );
+  }
+
+  async create(input: GoalAllocationCreateInput): Promise<GoalAllocation> {
+    const now = new Date();
+    const row: GoalAllocation = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      goalId: input.goalId,
+      accountId: input.accountId,
+      amount: input.amount,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async update(id: string, ownerId: string, changes: GoalAllocationUpdateInput): Promise<GoalAllocation> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal allocation ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async softDelete(id: string, ownerId: string): Promise<void> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Goal allocation ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
   }
 }
 

@@ -1,11 +1,14 @@
-import { ChevronDown, Plus } from "lucide-react";
+import type { LinkableAccountOption, LinkableCategoryOption } from "@/application/goals/goals-views";
 
-// TECH DEBT: there is no Goals domain yet (no schema, service, repository,
-// or Server Action) — creating a goal isn't possible. Shown disabled
-// rather than omitted so the page's action hierarchy matches the approved
-// mockup, per the same convention as Budgets' "Create Budget" and
-// Transactions' "Add Transaction".
-export function GoalsHeader() {
+import { CreateGoalButton } from "./create-goal-button";
+
+export function GoalsHeader({
+  linkableAccounts,
+  linkableCategories,
+}: {
+  linkableAccounts: LinkableAccountOption[];
+  linkableCategories: LinkableCategoryOption[];
+}) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
@@ -13,16 +16,7 @@ export function GoalsHeader() {
         <p className="mt-1 text-sm text-[var(--foreground-muted)]">Build the future you want, one goal at a time.</p>
       </div>
 
-      <button
-        type="button"
-        disabled
-        title="Creating goals isn't available yet"
-        className="flex shrink-0 cursor-not-allowed items-center gap-2 rounded-[calc(var(--radius)-8px)] bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white opacity-60"
-      >
-        <Plus className="h-4 w-4" strokeWidth={2} />
-        Create Goal
-        <ChevronDown className="h-4 w-4" strokeWidth={2} />
-      </button>
+      <CreateGoalButton linkableAccounts={linkableAccounts} linkableCategories={linkableCategories} />
     </div>
   );
 }

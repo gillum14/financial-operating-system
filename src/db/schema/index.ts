@@ -6,3 +6,4 @@ export * from "./categories";
 export * from "./transactions";
 export * from "./data-provider-connections";
 export * from "./budgets";
+export * from "./goals";
