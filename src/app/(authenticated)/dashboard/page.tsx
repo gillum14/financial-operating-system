@@ -174,7 +174,13 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net Worth" value={currencyFormatter.format(snapshot.netWorth.value)} icon={TrendingUp}>
+        {/* Value comes from netWorthOverview (the same getNetWorthOverview
+            call the Net Worth page itself renders), not snapshot.netWorth
+            — DashboardService's own netWorth is now computed via the same
+            canonical computeNetWorthBreakdown and will always agree, but
+            rendering from one single fetched value here removes any
+            dependency on two independent calls staying in sync. */}
+        <StatCard label="Net Worth" value={currencyFormatter.format(netWorthOverview.netWorth)} icon={TrendingUp}>
           {netWorthOverview.netWorthChange ? (
             <StatDelta {...formatStatDelta(netWorthOverview.netWorthChange)} />
           ) : (

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { computeNetWorthBreakdown } from "@/application/net-worth/net-worth-breakdown";
 import {
   FakeAccountRepository,
   FakeCategoryRepository,
@@ -140,18 +141,95 @@ describe("DashboardService", () => {
     expect(data.cashFlowByDate).toEqual([{ date: today, income: 1000, expenses: 0 }]);
   });
 
-  it("computes net worth as the sum of all account balances, including negative liabilities", async () => {
-    await accountRepository.create({ ownerId, name: "Checking", accountType: "checking", currentBalance: "500.00" });
-    await accountRepository.create({
-      ownerId,
-      name: "Credit Card",
-      accountType: "credit-card",
-      currentBalance: "-150.00",
+  // Regression coverage for the DashboardService Net Worth canonicalization
+  // refactor: this must never again be a second, independently-maintained
+  // signed-sum — it must be computeNetWorthBreakdown, byte-for-byte.
+  describe("Net Worth canonicalization", () => {
+    it("computes net worth, total assets, and total liabilities via the exact same function the Net Worth page uses", async () => {
+      const checking = await accountRepository.create({
+        ownerId,
+        name: "Checking",
+        accountType: "checking",
+        currentBalance: "500.00",
+      });
+      const creditCard = await accountRepository.create({
+        ownerId,
+        name: "Credit Card",
+        accountType: "credit-card",
+        currentBalance: "-150.00",
+      });
+
+      const data = await service.getDashboardData(ownerId);
+      const expected = computeNetWorthBreakdown([checking, creditCard]);
+
+      expect(data.netWorth).toBe(expected.netWorth);
+      expect(data.totalAssets).toBe(expected.totalAssets);
+      expect(data.totalLiabilities).toBe(expected.totalLiabilities);
+      expect(data.netWorth).toBe(350);
+      expect(data.totalAssets).toBe(500);
+      expect(data.totalLiabilities).toBe(150);
     });
 
-    const data = await service.getDashboardData(ownerId);
+    it("classifies liabilities by account presentation group, not by raw sign — a liability's negative balance becomes a positive totalLiabilities magnitude", async () => {
+      await accountRepository.create({ ownerId, name: "Mortgage", accountType: "mortgage", currentBalance: "-300000.00" });
+      await accountRepository.create({ ownerId, name: "Auto Loan", accountType: "vehicle-loan", currentBalance: "-12000.00" });
 
-    expect(data.netWorth).toBe(350);
+      const data = await service.getDashboardData(ownerId);
+
+      expect(data.totalLiabilities).toBe(312000);
+      expect(data.totalAssets).toBe(0);
+      expect(data.netWorth).toBe(-312000);
+    });
+
+    it("excludes archived accounts from net worth, total assets, and total liabilities — same active-only population getNetWorthOverview uses", async () => {
+      const active = await accountRepository.create({
+        ownerId,
+        name: "Active Checking",
+        accountType: "checking",
+        currentBalance: "1000.00",
+      });
+      const toArchive = await accountRepository.create({
+        ownerId,
+        name: "Old Savings",
+        accountType: "savings",
+        currentBalance: "5000.00",
+      });
+      await accountRepository.archive(toArchive.id, ownerId);
+
+      const data = await service.getDashboardData(ownerId);
+
+      expect(data.netWorth).toBe(1000);
+      expect(data.totalAssets).toBe(1000);
+      // The archived account still appears in the accounts list itself
+      // (accountsWithInstitutions, used by the Accounts Overview widget —
+      // unrelated to Net Worth math and deliberately left unfiltered).
+      expect(data.accounts.map((entry) => entry.account.name)).toContain("Old Savings");
+      expect(active.status).toBe("active");
+    });
+
+    it("returns zero net worth, total assets, and total liabilities when the owner has no accounts", async () => {
+      const data = await service.getDashboardData(ownerId);
+
+      expect(data.netWorth).toBe(0);
+      expect(data.totalAssets).toBe(0);
+      expect(data.totalLiabilities).toBe(0);
+    });
+
+    it("handles a mixed asset/liability portfolio consistently with computeNetWorthBreakdown", async () => {
+      const accountsCreated = await Promise.all([
+        accountRepository.create({ ownerId, name: "Checking", accountType: "checking", currentBalance: "4200.00" }),
+        accountRepository.create({ ownerId, name: "Brokerage", accountType: "investment", currentBalance: "18000.00" }),
+        accountRepository.create({ ownerId, name: "Credit Card", accountType: "credit-card", currentBalance: "-980.00" }),
+        accountRepository.create({ ownerId, name: "Mortgage", accountType: "mortgage", currentBalance: "-250000.00" }),
+      ]);
+
+      const data = await service.getDashboardData(ownerId);
+      const expected = computeNetWorthBreakdown(accountsCreated);
+
+      expect(data.netWorth).toBe(expected.netWorth);
+      expect(data.totalAssets).toBe(expected.totalAssets);
+      expect(data.totalLiabilities).toBe(expected.totalLiabilities);
+    });
   });
 
   it("computes investments total from only investment and retirement accounts", async () => {

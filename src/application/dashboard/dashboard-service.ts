@@ -1,3 +1,4 @@
+import { computeNetWorthBreakdown } from "@/application/net-worth/net-worth-breakdown";
 import type { Account } from "@/domains/accounts/types";
 import type { AccountRepository } from "@/domains/accounts/repository";
 import type { CategoryRepository } from "@/domains/categories/repository";
@@ -32,6 +33,13 @@ export interface DashboardRawData {
   categoryTotals: CategoryTotal[];
   cashFlowByDate: CashFlowByDate[];
   netWorth: number;
+  // Exposed alongside netWorth (not currently rendered by any Dashboard
+  // widget) so canonical parity with the Net Worth page's totalAssets/
+  // totalLiabilities is directly assertable in tests without reaching
+  // into the UI layer — see net-worth-breakdown.ts's computeNetWorthBreakdown,
+  // the single function both numbers below and netWorth come from.
+  totalAssets: number;
+  totalLiabilities: number;
   investmentsTotal: number;
   monthlyCashFlow: number;
   periodLabel: string;
@@ -135,13 +143,25 @@ export class DashboardService {
       }
     }
 
-    // Net worth / investments assume liability-type account balances are
-    // stored negative (the Slice 3 seed-data convention) — nothing in the
-    // schema enforces this, it's a documented assumption, not a guarantee.
-    const netWorth = accounts.reduce(
-      (sum, account) => sum + (account.currentBalance ? Number(account.currentBalance) : 0),
-      0,
-    );
+    // Net Worth is computed by the exact same canonical function the Net
+    // Worth page and its composition layer use (see net-worth-breakdown.ts's
+    // computeNetWorthBreakdown), fed the same active-only account
+    // population getNetWorthOverview fetches (accountRepository.listForOwner
+    // (ownerId, "active")) — filtered here from the already-fetched full
+    // account list rather than a second query, since this method also
+    // needs the full (including archived) list for accountsWithInstitutions
+    // below. This is not a second Net Worth calculation: it is the one
+    // canonical calculation, given the one canonical account population,
+    // computed once. Dashboard and the Net Worth page can no longer
+    // silently disagree on Net Worth, Total Assets, or Total Liabilities
+    // for the same owner.
+    const activeAccounts = accounts.filter((account) => account.status === "active");
+    const { netWorth, totalAssets, totalLiabilities } = computeNetWorthBreakdown(activeAccounts);
+
+    // Investments total is a different, narrower metric (not Net Worth
+    // itself) — kept as its own simple sum, unchanged by this
+    // canonicalization; it does not participate in the Net Worth
+    // duplicate-math problem this refactor exists to fix.
     const investmentsTotal = accounts
       .filter((account) => account.accountType === "investment" || account.accountType === "retirement")
       .reduce((sum, account) => sum + (account.currentBalance ? Number(account.currentBalance) : 0), 0);
@@ -156,6 +176,8 @@ export class DashboardService {
         .map(([date, values]) => ({ date, ...values }))
         .sort((a, b) => (a.date < b.date ? -1 : 1)),
       netWorth,
+      totalAssets,
+      totalLiabilities,
       investmentsTotal,
       monthlyCashFlow,
       periodLabel: `${dateFrom} – ${dateTo}`,
