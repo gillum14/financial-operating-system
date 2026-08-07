@@ -56,6 +56,8 @@ function makeRawData(overrides: Partial<DashboardRawData> = {}): DashboardRawDat
     categoryTotals: [],
     cashFlowByDate: [],
     netWorth: 0,
+    totalAssets: 0,
+    totalLiabilities: 0,
     investmentsTotal: 0,
     monthlyCashFlow: 0,
     periodLabel: "2026-06-30 – 2026-07-30",

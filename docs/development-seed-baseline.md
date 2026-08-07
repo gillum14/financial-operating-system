@@ -80,39 +80,91 @@ non-legacy owner is just as idempotent on rerun as the legacy one.
 
 ## Baseline row counts
 
-**Updated 2026-08-07** after switching the canonical seed owner (see
-"Retired seed owner" above). Recorded immediately after `npm run db:seed`
-for the new owner, re-verified identical after a second `npm run db:seed`
-run (idempotency), and again after a full `npm run test:full` run:
+**Refreshed 2026-08-07** as part of the Net Worth calculation
+canonicalization work — the prior table (also dated 2026-08-07, from the
+seed-owner switch) predated the Budgets, Goals, and Net Worth History
+slices entirely and had drifted stale. Recorded directly from the live
+dev Supabase project, re-verified identical after a repeat `npm run
+db:seed` run (idempotency) and after a full `npm run test:full` run (see
+"Verifying the baseline hasn't drifted" below).
 
-| Table | Canonical owner (`7a02431b-...`) | Retired owner (`2d2c216c-...`) | Total (all owners) |
-| --- | --- | --- | --- |
-| `institutions` | 3 (shared) | 3 (shared) | 3 |
-| `categories` | 47 | 47 | 99 |
-| `accounts` | 12 | 12 | 24 |
-| `transactions` | 1,120 | 1,130 | 2,250 |
-| `data_provider_connections` | 2 | 2 | 4 |
-| `users` (public) / `auth.users` | — | — | 4 |
+| Table | Canonical owner (`7a02431b-...`) | Retired owner (`2d2c216c-...`) | RLS test user A (`10000000-...a`) | RLS test user B (`10000000-...b`) | Total (all owners) |
+| --- | --- | --- | --- | --- | --- |
+| `institutions` (shared, no `owner_id`) | 3 | 3 | 3 | 3 | 3 |
+| `categories` | 48 | 47 | 5 | 0 | 100 |
+| `accounts` | 12 | 12 | 0 | 0 | 24 |
+| `transactions` | 1,120 | 1,130 | 0 | 0 | 2,250 |
+| `data_provider_connections` | 2 | 2 | 0 | 0 | 4 |
+| `budget_periods` | 2 | 0 | 0 | 0 | 2 |
+| `budget_allocations` | 19 | 0 | 0 | 0 | 19 |
+| `budget_allocation_adjustments` | 2 | 0 | 0 | 0 | 2 |
+| `goals` | 23 | 0 | 0 | 0 | 23 |
+| `goal_contributions` | 68 | 0 | 0 | 0 | 68 |
+| `goal_allocations` | 6 | 0 | 0 | 0 | 6 |
+| `account_balance_snapshots` | 144 | 0 | 0 | 0 | 144 |
+| `users` (public) / `auth.users` | — | — | — | — | 4 |
 
 Institutions are shared across every owner (see "Owner-scoped fixture ids"
-above), so they're not additive — 3 total either way, not 3+3.
+above), so they're not additive — 3 total, not 3+3+3+3.
 
 The retired owner's `transactions` count (1,130) is 10 higher than the
 canonical owner's (1,120): those 10 rows are the very original minimal
 seed transactions from before the sandbox expansion, which only ever
 existed for that one owner and were never regenerated for the new owner
-(the sandbox generators fully superseded them going forward).
+(the sandbox generators fully superseded them going forward). The retired
+owner predates Budgets, Goals, and Net Worth History entirely, hence zero
+rows in every table those slices introduced.
 
 `users`/`auth.users` total = 4: the canonical seed owner, the retired seed
-owner (left in place, not deleted), and the two persistent RLS test
+owner (left in place, not deleted — see "Retired seed owner" above; this
+branch does not delete it either), and the two persistent RLS test
 identities (`SUPABASE_TEST_USER_A`/`B`), which exist independently of
 seeding.
 
-`categories` total (99) = 47 (canonical owner) + 47 (retired owner) + 5
-belonging to `SUPABASE_TEST_USER_A` (owner id `10000000-0000-4000-8000-
-00000000000a`), created through live UI testing of the Categories feature
-earlier in this project's history, not by seeding. That owner's rows are
-untouched by the seed script; their presence is expected, not drift.
+### Fixture counts vs. actual row counts: the canonical owner is a *used* account, not a static snapshot
+
+Running `npm run db:seed` today inserts exactly what `buildDevData()`
+currently defines for the canonical owner: 48 categories, 12 accounts,
+1,120 transactions, 2 connections, 2 budget periods, **17** budget
+allocations, **8** goals, **62** goal contributions, **4** goal
+allocations, and 144 net worth snapshots (see the script's own "Seeded
+N ..." log lines). Everything above that — currently **+2** budget
+allocations, **+15** goals, **+6** goal contributions, and **+2** goal
+allocations relative to the fixture counts — is real data the canonical
+owner's account has accumulated through actual application usage (real
+Server Actions through the real UI), not something `npm run db:seed`
+produced or something to "fix":
+
+- 15 of the 23 goals are `archived` Playwright/manual QA test goals
+  (titled `Playwright Test Goal ...` / `Debug ... Test ...`, all created
+  2026-08-07) — leftover artifacts of live end-to-end testing against
+  this account in an earlier session, not part of the deterministic
+  fixture set. They carry 2 goal contributions and 2 goal allocations
+  between them. The 8 real fixture goals (House Down Payment, Debt
+  Payoff, Emergency Fund, Home Renovation Fund, Roth IRA Contribution,
+  Wedding Fund, Vacation Fund, College Fund) are unaffected and still
+  match the fixture file exactly.
+- The remaining small deltas (budget allocations, a few goal
+  contributions) are ordinary incidental edits from the same kind of
+  live testing.
+
+**This is expected, not drift to reconcile.** `npm run db:seed`'s
+idempotency guarantee is "the fixture rows always exist," not "the
+account's row counts never grow" — a real, used development account is
+expected to accumulate additional real rows over time. Per this branch's
+scope guardrails, none of this accumulated data was deleted or migrated;
+it was only measured and documented here so the *actual* current baseline
+is what future drift-checks compare against, not the smaller fixture-only
+counts a fresh `npm run db:seed` alone would produce.
+
+`categories` total (100) = 48 (canonical owner) + 47 (retired owner) + 5
+belonging to `SUPABASE_TEST_USER_A`, created through live UI testing of
+the Categories feature earlier in this project's history, not by seeding.
+That owner's rows are untouched by the seed script; their presence is
+expected, not drift. (The canonical owner's own category fixture count
+grew from 47 to 48 categories between the prior baseline and this one, as
+part of ordinary category-fixture development — not related to this
+branch's Net Worth work.)
 
 ## Reproducing this baseline
 
@@ -134,7 +186,23 @@ insert.
 npm run test:full
 ```
 
-Row counts across the tables above should be identical before and after.
-If they aren't, stop and investigate before continuing — see
+`npm run test:full` (unit tests + `test:db`) never writes to the canonical
+owner's data: DB-backed repository/RLS tests run inside a rolled-back
+transaction (`withRollback`) or a separately-connected, independently
+cleaned-up race test against a fresh random owner; the composition-root
+integration tests (`net-worth-composition.test.ts`,
+`dashboard-net-worth-consistency.test.ts`, etc.) are read-only queries
+against `SEED_OWNER_ID`. Row counts across every table above should
+therefore be **exactly identical** before and after running it — verified
+for this refresh by re-querying every table in the row-count section
+immediately after a full `npm run test:full` run.
+
+If they aren't identical, stop and investigate before continuing — see
 `docs/testing.md`'s incident writeup for what "don't assume it's fine"
-looks like in practice.
+looks like in practice. Note the distinction from "Fixture counts vs.
+actual row counts" above: re-running `npm run db:seed` is expected to
+leave goals/budget_allocations/goal_contributions/goal_allocations
+unchanged too (idempotent), but comparing against a *fresh* `npm run
+db:seed` on a brand-new owner will legitimately show fewer rows in those
+four tables than the canonical owner has — that's the accumulated live-
+testing data described above, not seed-script drift.
