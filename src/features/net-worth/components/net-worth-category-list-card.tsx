@@ -1,7 +1,7 @@
 import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 import ProgressBar from "@/components/ui/progress-bar";
-import type { NetWorthCategoryItem } from "@/application/net-worth/net-worth-views";
+import type { CategoryBalanceChange, NetWorthCategoryItem } from "@/application/net-worth/net-worth-views";
 import { categoryTone } from "@/lib/category-color";
 import { AccountIcon } from "@/features/accounts/components/account-icon";
 import { getAccountPresentation } from "@/application/dashboard/account-presentation";
@@ -19,13 +19,21 @@ export function NetWorthCategoryListCard({
   items,
   total,
   emptyText,
+  changes,
 }: {
   title: string;
   totalLabel: string;
   items: NetWorthCategoryItem[];
   total: number;
   emptyText: string;
+  // Category-level change since the last historical snapshot (task §4:
+  // "category-level asset/liability change where existing presentation
+  // supports it") — empty when there's no comparison point yet, in which
+  // case no delta badge renders, same honest-omission behavior as every
+  // other delta on this page.
+  changes?: CategoryBalanceChange[];
 }) {
+  const changeByType = new Map((changes ?? []).map((change) => [change.accountType, change]));
   return (
     <Card>
       <CardHeader title={title}>
@@ -47,6 +55,7 @@ export function NetWorthCategoryListCard({
             {items.map((item) => {
               const tone = categoryTone(item.label);
               const { group } = getAccountPresentation(item.accountType);
+              const change = changeByType.get(item.accountType);
               return (
                 <li key={item.accountType}>
                   <div className="flex items-center justify-between text-sm">
@@ -60,6 +69,12 @@ export function NetWorthCategoryListCard({
                       {item.label}
                     </span>
                     <span className="flex items-center gap-3 text-[var(--foreground)]">
+                      {change && change.absoluteChange !== 0 && (
+                        <span className={change.absoluteChange > 0 ? "text-xs text-[var(--success)]" : "text-xs text-[var(--danger)]"}>
+                          {change.absoluteChange > 0 ? "+" : "-"}
+                          {formatCurrency(Math.abs(change.absoluteChange))}
+                        </span>
+                      )}
                       {formatCurrency(item.amount)}
                       <span className="w-10 text-right text-[var(--foreground-muted)]">{Math.round(item.percent)}%</span>
                     </span>

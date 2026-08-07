@@ -1066,6 +1066,26 @@ Net Worth = Total Assets - Total Liabilities
 - Debt and liability relationships must not cause double counting.
 - Snapshot calculations must be deterministic and reproducible.
 
+### Implementation: Historical Snapshots (Net Worth History V1)
+
+Implemented in `src/db/schema/net-worth-snapshots.ts`, `src/domains/net-worth-history/`, `src/application/net-worth/{net-worth-breakdown.ts,net-worth-history-calculations.ts,snapshot-capture-service.ts}`, `src/infrastructure/db/net-worth-history-repository.ts`, `src/composition/{net-worth-composition.ts,net-worth-query.ts}`, and `src/features/net-worth/actions.ts`. See `docs/adr/0004-net-worth-snapshot-architecture.md` (Accepted) for the full architecture decision.
+
+**Storage model — account-level, not a stored Net Worth aggregate.** Athena stores `account_balance_snapshots`, one immutable row per (account, snapshot date), never a `net_worth_snapshots` table. Each row denormalizes `accountType` and `balanceSource` as they were *at capture time*, so historical reconstruction never depends on a possibly-since-changed live `accounts` row. Net Worth history (totals, per-category breakdowns, deltas) is derived at read time by running the exact same classification core (`computeNetWorthBreakdownCore`) the current-balance path already uses — `computeNetWorthBreakdown` (live accounts) and `computeHistoricalNetWorthBreakdown` (a date's snapshot rows) are both thin wrappers over it. There is exactly one Net Worth calculation path, current or historical.
+
+**Immutability.** `account_balance_snapshots` has no `updatedAt`/`deletedAt` columns at all — only `createdAt`. RLS grants `SELECT, INSERT` only; there is no `UPDATE` grant and no `DELETE` grant, at any layer, for any user (see `net-worth-model.md` §19: "Athena must never modify historical snapshots"). This is a deliberate, stricter deviation from every other owned table in this schema (which get soft-delete via `deletedAt`) — a balance snapshot has no legitimate post-creation edit workflow, so there is no escape hatch to close.
+
+**Idempotent capture.** A unique index on `(account_id, snapshot_date)` makes capture safe to re-run: `SnapshotCaptureService.captureSnapshot(ownerId, snapshotDate, snapshotType)` inserts one row per active account via `ON CONFLICT DO NOTHING`, so a repeated capture for a date that's already captured writes nothing and never overwrites. `captureMonthlySnapshot(ownerId, asOf)` always targets the last day of the month *before* `asOf`'s month (a monthly capture only ever snapshots a finished month); `captureManualSnapshot(ownerId, asOf)` targets `asOf`'s own date directly, for material-event or dev/verification capture.
+
+**No scheduler exists yet.** Nothing in this codebase invents background-job infrastructure — `captureMonthlySnapshot` is the entry point a future scheduled job should call once per month per owner; until that scheduler exists, the only caller is `captureManualNetWorthSnapshot` (`features/net-worth/actions.ts`), a Server Action that takes no balance input at all (it captures whatever the caller's own real account balances already are, for the caller's own owner id only) — not an arbitrary balance-writing UI, and not a substitute for the documented future scheduled job.
+
+**First snapshot / missing history.** With zero snapshots, `getNetWorthOverview` returns `hasHistory: false` and every delta (`netWorthChange`/`totalAssetsChange`/`totalLiabilitiesChange`) as `null` — the UI renders an honest unavailable state, never a fabricated comparison. The comparison point for every delta is the single most recent historical snapshot date available (`selectComparisonPoint`), captioned with its real date, not a hardcoded "vs last 30 days" that might not match the actual gap.
+
+**Dashboard/Net Worth consistency.** Both the Dashboard page and the Net Worth page call the same `getNetWorthOverview` composition function for their Net Worth delta — there is no second delta calculation to drift from it.
+
+**Canonical sandbox only.** `src/db/seed/fixtures/net-worth-snapshots.ts` seeds 12 months of deterministic monthly snapshots (Aug 2025–Jul 2026) for the canonical seed owner, built by linearly interpolating each account from a fixed 12-months-ago balance to that account's own real current balance — never a fabrication of a real user's history. One deliberate one-month "market correction" (a synchronized dip in the three investment/retirement accounts at April 2026, recovering the following month) produces the required net-worth-decline month within an overall-rising trend. This is exclusively a sandbox fixture; a real user's first snapshot always establishes their own baseline going forward, with no backfilled history.
+
+**Out of scope for V1**: Net Worth Goals/Milestones (no real domain backs them), Liquid Net Worth, real-estate/secured-debt equity as first-class calculations, valuation confidence/freshness beyond the existing `balanceSource` enum, manual Assets/Liabilities as entities separate from Accounts, and a `calculationVersion` field for future non-backward-compatible classification changes. See `docs/products/net-worth-specification.md` and `docs/financial-model/net-worth-model.md` for the fuller aspirational scope.
+
 ---
 
 ## Financial Goals

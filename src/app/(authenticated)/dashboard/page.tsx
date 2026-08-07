@@ -1,13 +1,15 @@
 import { Banknote, PieChart, Target, TrendingUp } from "lucide-react";
 
-import StatCard, { StatCaption } from "@/components/ui/stat-card";
+import StatCard, { StatCaption, StatDelta } from "@/components/ui/stat-card";
 import ProgressBar from "@/components/ui/progress-bar";
 import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 import { getBudgetsOverview } from "@/composition/budgets-query";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
 import { getGoalsOverview } from "@/composition/goals-query";
+import { getNetWorthOverview } from "@/composition/net-worth-query";
 import { getUserProfile } from "@/composition/user-profile";
+import { formatStatDelta } from "@/features/net-worth/format";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import type { BudgetProgress, MissionProgressItem } from "@/features/dashboard/types";
 import {
@@ -94,6 +96,14 @@ export default async function DashboardPage() {
   // former mock data had (2 example goals) but real and unbounded by a
   // hardcoded list.
   const goalsOverview = await getGoalsOverview(authUser.id);
+
+  // Same composition function the Net Worth page itself calls
+  // (getNetWorthOverview) — the Net Worth tile's delta below is the exact
+  // same netWorthChange that page's summary metrics render, never a
+  // second delta calculation. hasHistory gates it: with no historical
+  // snapshot yet, the tile falls back to the same honest "as of" caption
+  // it always had, never a fabricated 0% or invented comparison.
+  const netWorthOverview = await getNetWorthOverview(authUser.id);
   const missionProgress: MissionProgressItem[] = (goalsOverview.goals ?? [])
     .filter((goal) => goal.status === "active")
     .slice(0, 4)
@@ -165,7 +175,11 @@ export default async function DashboardPage() {
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Net Worth" value={currencyFormatter.format(snapshot.netWorth.value)} icon={TrendingUp}>
-          <StatCaption caption={asOfLabel} />
+          {netWorthOverview.netWorthChange ? (
+            <StatDelta {...formatStatDelta(netWorthOverview.netWorthChange)} />
+          ) : (
+            <StatCaption caption={asOfLabel} />
+          )}
         </StatCard>
 
         <StatCard
