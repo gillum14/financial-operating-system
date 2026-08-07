@@ -2,6 +2,20 @@ import { db, queryClient } from "../client";
 import { accounts, categories, dataProviderConnections, institutions, transactions } from "../schema";
 import { buildDevData } from "./data";
 
+// Chunked rather than one INSERT with 1000+ VALUES rows — comfortably
+// under any reasonable statement-size/parameter-count limit, and keeps
+// each round trip fast. Purely a batching detail: onConflictDoNothing
+// still applies per row, so idempotency is unaffected by the chunk size.
+const TRANSACTION_INSERT_BATCH_SIZE = 250;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // Printed as-is (no stack trace, no "Seed failed:" wrapper) — this is an
 // expected, well-understood configuration gap, not an unexpected error,
 // so it gets a guided walkthrough instead of an exception dump. See
@@ -60,7 +74,9 @@ async function seed(): Promise<boolean> {
   await db.insert(accounts).values(devAccounts).onConflictDoNothing();
   console.log(`Seeded ${devAccounts.length} account(s)`);
 
-  await db.insert(transactions).values(devTransactions).onConflictDoNothing();
+  for (const batch of chunk(devTransactions, TRANSACTION_INSERT_BATCH_SIZE)) {
+    await db.insert(transactions).values(batch).onConflictDoNothing();
+  }
   console.log(`Seeded ${devTransactions.length} transaction(s)`);
 
   await db.insert(dataProviderConnections).values(devDataProviderConnections).onConflictDoNothing();

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getAccountDetailView, listInstitutionOptions } from "@/composition/accounts-query";
+import { getAccountDetailPageData } from "@/composition/accounts-query";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import { AccountDetailHeader } from "@/features/accounts/components/account-detail-header";
 import { AccountDetailTabs } from "@/features/accounts/components/account-detail-tabs";
@@ -11,10 +11,10 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const { accountId } = await params;
   const authUser = await requireAuthenticatedUser();
 
-  const [detail, institutions] = await Promise.all([
-    getAccountDetailView(authUser.id, accountId),
-    listInstitutionOptions(),
-  ]);
+  // Single call, single flat query batch inside it — see the comment on
+  // getAccountDetailPageData for why this must not be two separate
+  // composed functions combined via an outer Promise.all here.
+  const { detail, institutions } = await getAccountDetailPageData(authUser.id, accountId);
 
   // A missing account and another owner's account resolve identically —
   // never confirming which case applied, matching the Server Action layer

@@ -1,6 +1,6 @@
 import { Wallet } from "lucide-react";
 
-import { getAccountsListView, listInstitutionOptions } from "@/composition/accounts-query";
+import { getAccountsPageData } from "@/composition/accounts-query";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import { AccountsGroupSection } from "@/features/accounts/components/accounts-group-section";
 import { AccountsSummaryTiles } from "@/features/accounts/components/accounts-summary-tiles";
@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const authUser = await requireAuthenticatedUser();
-  const [listView, institutions] = await Promise.all([
-    getAccountsListView(authUser.id),
-    listInstitutionOptions(),
-  ]);
+  // Single call, single flat query batch inside it — see the comment on
+  // getAccountsPageData for why this must not be two separate composed
+  // functions combined via an outer Promise.all here.
+  const { listView, institutions } = await getAccountsPageData(authUser.id);
 
   return (
     <div className="space-y-6">

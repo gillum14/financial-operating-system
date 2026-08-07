@@ -11,7 +11,7 @@ import type {
 import { getAccountPresentation } from "@/application/dashboard/account-presentation";
 import type { AccountDisplayGroup } from "@/application/dashboard/account-presentation";
 import { db } from "@/db/client";
-import type { Account } from "@/domains/accounts/types";
+import type { Institution } from "@/domains/institutions/types";
 import { DrizzleAccountRepository } from "@/infrastructure/db/accounts-repository";
 import { DrizzleCategoryRepository } from "@/infrastructure/db/categories-repository";
 import { DrizzleInstitutionRepository } from "@/infrastructure/db/institutions-repository";
@@ -41,27 +41,70 @@ const categoryRepository = new DrizzleCategoryRepository(db);
 
 const GROUP_ORDER: AccountDisplayGroup[] = ["Cash", "Credit", "Loans", "Investments", "Assets"];
 
-async function resolveInstitutionNames(accounts: Account[]): Promise<Map<string, string>> {
-  const institutionIds = [...new Set(accounts.map((a) => a.institutionId).filter((id): id is string => Boolean(id)))];
-  const entries = await Promise.all(
-    institutionIds.map(async (id) => [id, (await institutionRepository.getById(id))?.name ?? null] as const),
-  );
-  return new Map(entries.filter((entry): entry is [string, string] => entry[1] !== null));
+// Both page-data functions below fetch the *entire* institutions list in
+// one query (institutions are few and shared, not owner-scoped — see
+// src/db/schema/institutions.ts) rather than looking up individual ids —
+// partly to keep this module's queries in one place, but the load-bearing
+// reason is the LIMIT rule below.
+//
+// CONFIRMED ROOT CAUSE (reproduced with controlled experiments — see
+// accounts-query.test.ts's "concurrent LIMIT query" block): with the db
+// client's pool held to a single connection, running a query that has a
+// LIMIT clause (e.g. AccountRepository.getByIdForOwner's `.limit(1)`)
+// concurrently with 2+ sibling queries via Promise.all reliably wedges
+// that connection indefinitely — reproduced 100% of the time, including
+// as the very first query in a fresh process, regardless of which
+// unrelated tables the sibling queries touch. Separately, even fully
+// sequential/LIMIT-free query batches (this codebase's own established
+// "good" pattern — DashboardService's Promise.all) showed non-trivial
+// intermittent hangs under repeated reuse of a single connection across
+// requests. Both symptoms disappeared in every trial once the pool was
+// given more than one connection to spread concurrent statements across
+// (see src/db/client.ts) — consistent with a postgres.js 3.4.9 /
+// single-connection interaction with Postgres's portal-suspend ("execute
+// with max rows") wire-protocol path when pipelined against other
+// concurrent statements on the *same* connection.
+//
+// The pool-size increase is the fix for the general/intermittent form of
+// this issue. This module additionally follows a stricter rule so the
+// *deterministic* form (LIMIT run concurrently with siblings) can never
+// happen here even under connection pressure: getByIdForOwner is always
+// awaited alone, never inside the same Promise.all as another query.
+function buildInstitutionNameMap(institutionRows: Institution[]): Map<string, string> {
+  return new Map(institutionRows.map((institution) => [institution.id, institution.name]));
 }
 
-// For the "Add account" / "Edit account" institution picker. Not
-// owner-scoped — institutions are shared reference data, not owned
-// records (see src/db/schema/institutions.ts).
-export async function listInstitutionOptions(): Promise<InstitutionOption[]> {
-  const institutions = await institutionRepository.list();
-  return institutions
+function toInstitutionOptions(institutionRows: Institution[]): InstitutionOption[] {
+  return institutionRows
     .map((institution) => ({ id: institution.id, name: institution.name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function getAccountsListView(ownerId: string): Promise<AccountsListView> {
-  const accounts = await accountRepository.listForOwner(ownerId, "active");
-  const institutionNameById = await resolveInstitutionNames(accounts);
+// For the "Add account" / "Edit account" institution picker, when nothing
+// else on the page also needs a concurrent DB read. Not owner-scoped —
+// institutions are shared reference data, not owned records. Do not call
+// this via Promise.all alongside another composed query function in this
+// module (see the comment above) — use getAccountsPageData /
+// getAccountDetailPageData instead, which fetch institutions as part of
+// their own single flat batch.
+export async function listInstitutionOptions(): Promise<InstitutionOption[]> {
+  const institutionRows = await institutionRepository.list();
+  return toInstitutionOptions(institutionRows);
+}
+
+export interface AccountsPageData {
+  listView: AccountsListView;
+  institutions: InstitutionOption[];
+}
+
+// Everything the Accounts index page needs, from one flat query batch.
+export async function getAccountsPageData(ownerId: string): Promise<AccountsPageData> {
+  const [accounts, institutionRows] = await Promise.all([
+    accountRepository.listForOwner(ownerId, "active"),
+    institutionRepository.list(),
+  ]);
+
+  const institutionNameById = buildInstitutionNameMap(institutionRows);
 
   const rows: AccountListRow[] = accounts.map((account) => {
     const presentation = getAccountPresentation(account.accountType);
@@ -78,30 +121,51 @@ export async function getAccountsListView(ownerId: string): Promise<AccountsList
     (groups[row.displayGroup] ??= []).push(row);
   }
 
-  return { rows, groupOrder: GROUP_ORDER, groups, summary: summarizeAccounts(accounts) };
+  return {
+    listView: { rows, groupOrder: GROUP_ORDER, groups, summary: summarizeAccounts(accounts) },
+    institutions: toInstitutionOptions(institutionRows),
+  };
 }
 
-// Returns null (never throws) when the account doesn't exist or isn't
-// owned by this caller — getByIdForOwner already can't distinguish those
-// cases, and the route calls Next's notFound() either way, never
-// confirming which one applied.
-export async function getAccountDetailView(
+export interface AccountDetailPageData {
+  // null when the account doesn't exist or isn't owned by this caller —
+  // getByIdForOwner already can't distinguish those cases, and the route
+  // calls Next's notFound() either way, never confirming which one
+  // applied. institutions is still populated in this case (the edit form
+  // needs it even on a fresh "add" attempt from a 404'd page).
+  detail: AccountDetailView | null;
+  institutions: InstitutionOption[];
+}
+
+// Everything the Account Detail page needs. accountRepository's lookup
+// carries a LIMIT clause internally (fetches at most one row by id), so it
+// is always awaited alone, never inside the same Promise.all as the other
+// three reads — see the module comment above for why. Institutions/
+// transactions/categories carry no LIMIT and are safe to batch together
+// once the account lookup has resolved.
+export async function getAccountDetailPageData(
   ownerId: string,
   accountId: string,
   options: { activityLimit?: number } = {},
-): Promise<AccountDetailView | null> {
-  const account = await accountRepository.getByIdForOwner(accountId, ownerId);
-  if (!account) return null;
-
+): Promise<AccountDetailPageData> {
   const activityLimit = options.activityLimit ?? 50;
-  const presentation = getAccountPresentation(account.accountType);
 
-  const [institution, transactions, categories] = await Promise.all([
-    account.institutionId ? institutionRepository.getById(account.institutionId) : Promise.resolve(null),
+  const account = await accountRepository.getByIdForOwner(accountId, ownerId);
+
+  const [institutionRows, transactions, categories] = await Promise.all([
+    institutionRepository.list(),
     transactionRepository.listForOwner(ownerId, { accountId, includeExcluded: true }),
     categoryRepository.listForOwner(ownerId),
   ]);
 
+  const institutions = toInstitutionOptions(institutionRows);
+
+  if (!account) {
+    return { detail: null, institutions };
+  }
+
+  const institutionNameById = buildInstitutionNameMap(institutionRows);
+  const presentation = getAccountPresentation(account.accountType);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
 
   // Bounded (not paginated) on purpose — the Transactions tab is a
@@ -132,10 +196,13 @@ export async function getAccountDetailView(
     });
 
   return {
-    account,
-    institutionName: institution?.name ?? null,
-    displayGroup: presentation.group,
-    displayLabel: presentation.label,
-    activity,
+    detail: {
+      account,
+      institutionName: account.institutionId ? (institutionNameById.get(account.institutionId) ?? null) : null,
+      displayGroup: presentation.group,
+      displayLabel: presentation.label,
+      activity,
+    },
+    institutions,
   };
 }
