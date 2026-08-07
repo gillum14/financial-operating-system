@@ -2,11 +2,14 @@ import { Banknote, PieChart, Target, TrendingUp } from "lucide-react";
 
 import StatCard, { StatCaption } from "@/components/ui/stat-card";
 import ProgressBar from "@/components/ui/progress-bar";
+import Card from "@/components/ui/card";
+import CardHeader from "@/components/ui/card-header";
+import { getBudgetsOverview } from "@/composition/budgets-query";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
 import { getUserProfile } from "@/composition/user-profile";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
+import type { BudgetProgress } from "@/features/dashboard/types";
 import {
-  budgetProgress,
   confidenceScore,
   confidenceTrends,
   dailyInsight,
@@ -40,6 +43,14 @@ function getGreeting(hour: number) {
   return "Good evening";
 }
 
+function daysRemainingInPeriod(periodEnd: string): number {
+  const end = new Date(`${periodEnd}T00:00:00Z`);
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -58,9 +69,10 @@ export default async function DashboardPage() {
   const firstName = (profile?.displayName ?? authUser.email).split(" ")[0];
 
   // Sections still sourced from mock data (Confidence Engine, Mission
-  // Engine, budget domain, and objectives/recommendations aren't
-  // implemented yet — out of scope for this slice) are wired below
-  // unchanged; everything else comes from a real DashboardSnapshot.
+  // Engine, and objectives/recommendations aren't implemented yet — out
+  // of scope for this slice) are wired below unchanged; everything else,
+  // including Budget Status/Progress below, comes from real composition
+  // queries.
   //
   // Recent Activity is a compact widget, not the full ledger — "View all"
   // is the entry point to the complete history. Uses DashboardService's
@@ -68,6 +80,23 @@ export default async function DashboardPage() {
   // so callers who need the full recent-transaction set (there are none
   // today) still get it by passing a larger limit or omitting it.
   const snapshot = await getDashboardSnapshot(authUser.id, { recentActivityLimit: 5 });
+
+  // Same composition function the Budgets page itself calls
+  // (getBudgetsOverview) — this is the one and only place budget totals
+  // are computed; the Dashboard never re-derives them from Transactions
+  // independently, so the two pages can never silently disagree.
+  const budgetOverview = await getBudgetsOverview(authUser.id);
+  const budgetProgress: BudgetProgress | null =
+    budgetOverview.hasBudget && budgetOverview.period && budgetOverview.metrics
+      ? {
+          percent: Math.round(budgetOverview.metrics.overallProgress),
+          budgeted: budgetOverview.metrics.totalBudgeted,
+          spent: budgetOverview.metrics.totalSpent,
+          remaining: budgetOverview.metrics.totalRemaining,
+          daysRemaining: daysRemainingInPeriod(budgetOverview.period.periodEnd),
+          periodLabel: budgetOverview.period.label,
+        }
+      : null;
 
   const asOfLabel = `As of ${new Date().toLocaleString("en-US", {
     month: "short",
@@ -129,12 +158,18 @@ export default async function DashboardPage() {
           <StatCaption caption={asOfLabel} />
         </StatCard>
 
-        <StatCard label="Budget Status" value={`${budgetProgress.percent}%`} icon={PieChart}>
-          <ProgressBar percent={budgetProgress.percent} />
-          <p className="mt-2 text-sm text-[var(--success)]">
-            ${budgetProgress.remaining.toLocaleString()} under budget
-          </p>
-        </StatCard>
+        {budgetProgress ? (
+          <StatCard label="Budget Status" value={`${budgetProgress.percent}%`} icon={PieChart}>
+            <ProgressBar percent={budgetProgress.percent} />
+            <p className={`mt-2 text-sm ${budgetProgress.remaining < 0 ? "text-[var(--danger)]" : "text-[var(--success)]"}`}>
+              ${Math.abs(budgetProgress.remaining).toLocaleString()} {budgetProgress.remaining < 0 ? "over budget" : "under budget"}
+            </p>
+          </StatCard>
+        ) : (
+          <StatCard label="Budget Status" value="—" icon={PieChart}>
+            <StatCaption caption="No active budget" />
+          </StatCard>
+        )}
 
         <StatCard label="Investments" value={currencyFormatter.format(snapshot.investments.value)} icon={Target}>
           <StatCaption caption={asOfLabel} />
@@ -146,7 +181,20 @@ export default async function DashboardPage() {
           <FinancialOverviewCard series={snapshot.cashFlowSeries} period={cashFlowPeriod} />
 
           <div className="grid gap-6 md:grid-cols-2">
-            <BudgetProgressCard progress={budgetProgress} />
+            {budgetProgress ? (
+              <BudgetProgressCard progress={budgetProgress} />
+            ) : (
+              <Card>
+                <CardHeader title="Budget Progress" />
+                <div className="flex flex-col items-center justify-center rounded-[calc(var(--radius)-8px)] border border-dashed border-[var(--border)] px-6 py-12 text-center">
+                  <PieChart className="h-6 w-6 text-[var(--foreground-muted)]" strokeWidth={1.5} />
+                  <p className="mt-3 text-sm font-medium text-[var(--foreground-secondary)]">No active budget</p>
+                  <p className="mt-1 max-w-xs text-xs text-[var(--foreground-muted)]">
+                    Create a budget to see planned vs. actual spending here.
+                  </p>
+                </div>
+              </Card>
+            )}
 
             <SpendingByCategoryCard
               categories={snapshot.spendingByCategory}

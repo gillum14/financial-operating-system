@@ -2,6 +2,22 @@ import { randomUUID } from "node:crypto";
 
 import type { AccountRepository } from "@/domains/accounts/repository";
 import type { Account, AccountCreateInput, AccountUpdateInput } from "@/domains/accounts/types";
+import type {
+  BudgetAllocationAdjustmentRepository,
+  BudgetAllocationRepository,
+  BudgetPeriodRepository,
+} from "@/domains/budgets/repository";
+import type {
+  BudgetAllocation,
+  BudgetAllocationAdjustment,
+  BudgetAllocationAdjustmentCreateInput,
+  BudgetAllocationCreateInput,
+  BudgetAllocationListFilter,
+  BudgetAllocationUpdateInput,
+  BudgetPeriod,
+  BudgetPeriodCreateInput,
+  BudgetPeriodStatusUpdateInput,
+} from "@/domains/budgets/types";
 import type { CategoryRepository } from "@/domains/categories/repository";
 import type { Category, CategoryCreateInput, CategoryUpdateInput } from "@/domains/categories/types";
 import type { DataProviderConnectionRepository } from "@/domains/data-provider-connections/repository";
@@ -332,6 +348,129 @@ export class FakeTransactionRepository implements TransactionRepository {
   async softDelete(id: string, ownerId: string): Promise<void> {
     const row = this.rows.get(id);
     if (row && row.ownerId === ownerId) this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+}
+
+export class FakeBudgetPeriodRepository implements BudgetPeriodRepository {
+  private readonly rows = new Map<string, BudgetPeriod>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<BudgetPeriod | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
+  }
+
+  async listForOwner(ownerId: string): Promise<BudgetPeriod[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId && !row.deletedAt)
+      .sort((a, b) => (a.periodStart < b.periodStart ? 1 : a.periodStart > b.periodStart ? -1 : 0));
+  }
+
+  async getActiveForOwner(ownerId: string): Promise<BudgetPeriod | null> {
+    return (
+      [...this.rows.values()].find((row) => row.ownerId === ownerId && row.status === "active" && !row.deletedAt) ??
+      null
+    );
+  }
+
+  async create(input: BudgetPeriodCreateInput): Promise<BudgetPeriod> {
+    const now = new Date();
+    const row: BudgetPeriod = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async updateStatus(id: string, ownerId: string, changes: BudgetPeriodStatusUpdateInput): Promise<BudgetPeriod> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Budget period ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+}
+
+export class FakeBudgetAllocationRepository implements BudgetAllocationRepository {
+  private readonly rows = new Map<string, BudgetAllocation>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<BudgetAllocation | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId && !row.deletedAt ? row : null;
+  }
+
+  async listForOwner(ownerId: string, filter?: BudgetAllocationListFilter): Promise<BudgetAllocation[]> {
+    return [...this.rows.values()]
+      .filter(
+        (row) =>
+          row.ownerId === ownerId &&
+          !row.deletedAt &&
+          (!filter?.budgetPeriodId || row.budgetPeriodId === filter.budgetPeriodId),
+      )
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+  }
+
+  async create(input: BudgetAllocationCreateInput & { displayOrder: number }): Promise<BudgetAllocation> {
+    const now = new Date();
+    const row: BudgetAllocation = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      budgetPeriodId: input.budgetPeriodId,
+      categoryId: input.categoryId,
+      plannedAmount: input.plannedAmount,
+      displayOrder: input.displayOrder,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async update(id: string, ownerId: string, changes: BudgetAllocationUpdateInput): Promise<BudgetAllocation> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Budget allocation ${id} not found for owner ${ownerId}`);
+    const updated = { ...row, ...changes, updatedAt: new Date() };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async softDelete(id: string, ownerId: string): Promise<void> {
+    const row = await this.getByIdForOwner(id, ownerId);
+    if (!row) throw new NotFoundError(`Budget allocation ${id} not found for owner ${ownerId}`);
+    this.rows.set(id, { ...row, deletedAt: new Date() });
+  }
+}
+
+// Insert-only, matching DrizzleBudgetAllocationAdjustmentRepository — no
+// update/softDelete methods exist on the real interface either.
+export class FakeBudgetAllocationAdjustmentRepository implements BudgetAllocationAdjustmentRepository {
+  private readonly rows: BudgetAllocationAdjustment[] = [];
+
+  async listForOwnerAndAllocations(ownerId: string, budgetAllocationIds: string[]): Promise<BudgetAllocationAdjustment[]> {
+    const idSet = new Set(budgetAllocationIds);
+    return this.rows
+      .filter((row) => row.ownerId === ownerId && idSet.has(row.budgetAllocationId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async create(input: BudgetAllocationAdjustmentCreateInput): Promise<BudgetAllocationAdjustment> {
+    const row: BudgetAllocationAdjustment = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      budgetAllocationId: input.budgetAllocationId,
+      previousAmount: input.previousAmount,
+      newAmount: input.newAmount,
+      createdAt: new Date(),
+    };
+    this.rows.push(row);
+    return row;
   }
 }
 

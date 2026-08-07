@@ -39,8 +39,9 @@ export function BudgetProgressCard({ progress }: { progress: BudgetProgress }) {
           </div>
 
           <div>
-            <p className="text-lg font-semibold text-[var(--success)]">
-              ${progress.remaining.toLocaleString()}
+            <p className={`text-lg font-semibold ${progress.remaining < 0 ? "text-[var(--danger)]" : "text-[var(--success)]"}`}>
+              ${Math.abs(progress.remaining).toLocaleString()}
+              {progress.remaining < 0 ? " over" : ""}
             </p>
             <p className="text-xs text-[var(--foreground-muted)]">Remaining</p>
           </div>

@@ -1,7 +1,6 @@
 import type {
   Account,
   ActivityItem,
-  BudgetProgress,
   CashFlowPoint,
   CategorySpend,
   ConfidenceScore,
@@ -40,15 +39,6 @@ export const statSummaries: StatSummary[] = [
     caption: "vs last 30 days",
   },
 ];
-
-export const budgetProgress: BudgetProgress = {
-  percent: 82,
-  budgeted: 4520,
-  spent: 3040,
-  remaining: 1480,
-  daysRemaining: 8,
-  periodLabel: "May 2026",
-};
 
 export const cashFlowSeries: CashFlowPoint[] = [
   { date: "Apr 30", income: 6520, expenses: 4180 },

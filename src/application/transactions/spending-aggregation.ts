@@ -73,3 +73,41 @@ export function computeCategoryBreakdown(rows: Transaction[], categoryNameById: 
 
   return breakdown;
 }
+
+// Shared with the Budgets domain (src/application/budgets/) for a
+// category's actual spending within a period — a sibling to
+// computeCategoryBreakdown above rather than a second definition of
+// "spending." Differs from computeCategoryBreakdown in exactly one way:
+// this nets income-typed rows against expense-typed rows in the *same*
+// category instead of only summing expenses, because refunds have no
+// distinct transaction type in this schema (see transactions.ts) — a
+// refund is modeled as an income row filed under the same category as the
+// purchase it reverses (the seed data's own convention), so netting
+// income against expense per category is how refunds get "handled
+// correctly" without inventing a refund concept the Transactions domain
+// itself doesn't have.
+//
+// Transfers are excluded by the same implicit income/expense-only branch
+// as computeSpendingSummary. Uncategorized rows (categoryId: null) are
+// dropped entirely — they can never match a specific budget allocation's
+// categoryId, so they must never silently count toward one. Callers are
+// responsible for excluding isExcluded transactions upstream (via the
+// repository's includeExcluded: false default), exactly as every other
+// caller of this file already does.
+export function computeCategorySpendForPeriod(rows: Transaction[]): Map<string, number> {
+  const spendByCategory = new Map<string, number>();
+  for (const transaction of rows) {
+    if (!transaction.categoryId) continue;
+    const amount = Number(transaction.amount);
+    let delta: number;
+    if (transaction.transactionType === "expense") {
+      delta = Math.abs(amount);
+    } else if (transaction.transactionType === "income") {
+      delta = -Math.abs(amount);
+    } else {
+      continue;
+    }
+    spendByCategory.set(transaction.categoryId, (spendByCategory.get(transaction.categoryId) ?? 0) + delta);
+  }
+  return spendByCategory;
+}

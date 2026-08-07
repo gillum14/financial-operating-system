@@ -1,4 +1,5 @@
 import { accountFixtures } from "./fixtures/accounts";
+import { budgetAllocationFixtures, budgetPeriodFixtures } from "./fixtures/budgets";
 import { categoryChildFixtures, categoryParentFixtures } from "./fixtures/categories";
 import { connectionFixtures } from "./fixtures/connections";
 import { institutionFixtures } from "./fixtures/institutions";
@@ -22,6 +23,8 @@ export function buildDevData(ownerId: string) {
     devAccounts: accountFixtures(ownerId),
     devTransactions: buildTransactions(ownerId),
     devDataProviderConnections: connectionFixtures(ownerId),
+    devBudgetPeriods: budgetPeriodFixtures(ownerId),
+    devBudgetAllocations: budgetAllocationFixtures(ownerId),
   };
 }
 
