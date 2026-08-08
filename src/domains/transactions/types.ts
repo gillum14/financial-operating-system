@@ -17,6 +17,12 @@ export type TransactionUpdateInput = Partial<
 export type TransactionListFilter = {
   accountId?: string;
   categoryId?: string;
+  // categoryId IS NULL — mutually exclusive with categoryId above (a
+  // caller filtering to a specific category can never also mean "and has
+  // no category"). Added for the Mission Engine's categorize-transactions
+  // mission, but not Missions-specific — it's a plain, reusable
+  // Transactions-domain filter, the same as every other field here.
+  uncategorizedOnly?: boolean;
   transactionType?: TransactionType;
   dateFrom?: string;
   dateTo?: string;

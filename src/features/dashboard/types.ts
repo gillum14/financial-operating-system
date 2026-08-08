@@ -23,16 +23,6 @@ export interface CategorySpend {
   color: string;
 }
 
-export type MissionStatusLevel = "on-track" | "needs-attention";
-
-export interface MissionStatusItem {
-  id: string;
-  label: string;
-  status: string;
-  level: MissionStatusLevel;
-  detail: string;
-}
-
 export interface CashFlowPoint {
   date: string;
   income: number;

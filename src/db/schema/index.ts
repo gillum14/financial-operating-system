@@ -9,3 +9,4 @@ export * from "./budgets";
 export * from "./goals";
 export * from "./net-worth-snapshots";
 export * from "./confidence-scores";
+export * from "./missions";

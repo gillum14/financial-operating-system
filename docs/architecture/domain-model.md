@@ -40,6 +40,7 @@
 - [Financial Goals](#financial-goals)
 - [Reporting](#reporting)
 - [Confidence](#confidence)
+- [Missions](#missions)
 - [Dashboard Configuration](#dashboard-configuration)
 - [Legal Expenses](#legal-expenses)
 - [Medical Expenses](#medical-expenses)
@@ -1261,13 +1262,13 @@ Implemented in `src/db/schema/confidence-scores.ts`, `src/domains/confidence/`, 
 
 **No duplicated financial math.** Every signal is built exclusively from canonical calculations this codebase already has: `computeNetWorthBreakdown`/`computeNetWorthHistory` (Net Worth), `BudgetService.getBudgetPeriodSummary` (Budgets), `GoalService.listGoalsWithProgress` (Goals), `computeSpendingSummary` (Transactions). `confidence-query.ts`'s `getConfidenceCalculationInputs` is the one place these are gathered; `computeConfidenceScore` (pure, no repository dependency) is the one place they are combined into pillar/overall scores.
 
-**Product-scope gaps are permanent, not per-owner.** Several named Measures have no backing domain at all in this codebase (insurance coverage, portfolio diversification, employer match, bills-paid-on-time, weekly reviews, Mission engagement/completion) — no Insurance, Investments-holdings, or Mission Engine domain exists. These are never estimated: each emits an always-unavailable `NOT_MEASURED_V1` signal (zero weight, purely informational), so what this version does not yet evaluate stays visible rather than silently omitted.
+**Product-scope gaps are permanent, not per-owner.** Several named Measures have no backing domain at all in this codebase (insurance coverage, portfolio diversification, employer match, bills-paid-on-time, weekly reviews) — no Insurance or Investments-holdings domain exists. These are never estimated: each emits an always-unavailable `NOT_MEASURED_V1` signal (zero weight, purely informational), so what this version does not yet evaluate stays visible rather than silently omitted. (Mission engagement/completion was in this list prior to Mission Engine V1 — see the Missions section below; it remains a `NOT_MEASURED_V1` signal here regardless, since Missions never feeds evidence back into a Confidence calculation.)
 
 **Persistence mirrors Net Worth History's architecture.** `confidence_score_snapshots` (immutable, insert-only, `SELECT`/`INSERT`-only RLS, unique on `(owner_id, snapshot_date)`) stores the *pillar scores* computed at capture time — never a full recomputation target. The current score is always computed live (`computeCurrentConfidenceScore`); trend/change attribution compares that live result against the single most recent real persisted snapshot (`selectComparisonSnapshot` + `computeConfidenceTrend`, the same "first snapshot establishes baseline" pattern as Net Worth). This satisfies "trend/history using real historical evidence only" without recomputing a fabricated historical score from old cross-domain data that, for Budgets/Goals, was never dated/snapshotted in the first place. No scheduler exists yet — the only capture path is a manual Server Action (`captureManualConfidenceSnapshot`) that takes no input and persists exactly what a live read would show, mirroring `captureManualNetWorthSnapshot` exactly.
 
 **Dashboard integration.** `getConfidenceOverview` (the same function the Dashboard page calls) replaces the former hardcoded mock (`confidenceScore`/`confidenceTrends` in `features/dashboard/mock-data.ts`, removed). `ConfidenceScoreCard` renders an honest "not enough data yet" state when `hasEvidence` is false, and an honest "first snapshot will establish your trend baseline" caption when `hasHistory` is false — never a fabricated score or trend. The card links to `/confidence` (confidence-engine.md's Dashboard Experience section: "Selecting the Confidence Score opens the full Confidence Engine experience").
 
-**Out of scope for V1** (per the implementation task's explicit instructions): AI coaching, the Mission Engine, the Financial Brief, Confidence Forecasting, and a Recommendations engine (ranking actions by estimated Confidence gain) — none of these are built. Reason codes satisfy the spec's "Why" and "What Helped/Declined" explainability questions; "What's Next" (a ranked recommendation) is not answered by this version.
+**Out of scope for V1** (per the implementation task's explicit instructions): AI coaching, the Financial Brief, Confidence Forecasting, and a Recommendations engine (ranking actions by estimated Confidence gain) — none of these are built. Reason codes satisfy the spec's "Why" and "What Helped/Declined" explainability questions; "What's Next" (a ranked recommendation) is not answered by this version. Mission Engine V1 (see below) is now built, but deliberately does not close this gap — it never writes Confidence evidence or ranks actions by estimated gain.
 
 ### Implementation: Confidence Insights V1 (presentation layer)
 
@@ -1276,6 +1277,52 @@ Implemented in `src/application/confidence/confidence-presentation.ts`, `src/fea
 **No new scoring logic, no new business logic.** `confidence-presentation.ts` is a pure, DB-free module whose functions only reshape, filter, sort, or narrate an already-computed `ConfidenceResult`/`ConfidencePillarResult[]` — `computeCompleteness` tallies pillar `status`, `selectPositiveSignals`/`selectNegativeSignals` filter and rank existing signals by distance from the neutral-50 midpoint every signal curve is already centered on, `buildScoreExplanation` is a deterministic template (never AI) naming the strongest/weakest *available* pillars, and `toHistoryPoint` reuses `bandForScore` — the exact function `computeConfidenceScore` itself calls — rather than a second band lookup. `getConfidenceOverview` (`confidence-query.ts`) calls these against data it already has (`result.pillars`, the already-fetched snapshot list) — no new repository calls were added for this slice.
 
 **Timeline is real snapshots only, never the live score appended.** Unlike Net Worth's over-time chart (which appends the current dynamic value to its historical series), the Confidence timeline shows only real persisted `confidence_score_snapshots` rows — a historical point's *available pillars* can differ from today's, so splicing in a live value would misrepresent it as one continuous series. The current score is shown separately in the overview stat row instead.
+
+---
+
+## Missions
+
+The Missions domain turns real financial state into a small set of concrete, deterministic actions a user can start and complete. See `docs/products/mission-engine.md`, `docs/products/missions-specification.md`, and `docs/financial-model/missions-model.md` for the full aspirational product vision, and `docs/adr/0006-mission-engine-v1-scope.md` for the authoritative record of what Mission Engine V1 actually implements and why it deliberately implements less than those documents describe.
+
+### Primary Entity
+
+#### Mission
+
+A Mission represents one user-started, real-data-backed action. It includes:
+
+- Owner
+- Mission type (one of six: stay-within-budget, fund-emergency-fund, reach-savings-goal, categorize-transactions, reduce-debt, improve-confidence)
+- Title and description (captured once, at start)
+- Status (active, completed, or archived)
+- A related Goal, Account, or Budget Period (exactly one, depending on mission type) or a snapshotted Transaction id set (categorize-transactions only)
+- An immutable start-time snapshot (startValue/targetValue/targetBandId, where applicable)
+- Started timestamp, completed timestamp (set once, never cleared)
+
+There is no "Suggested" or "Available" row — see Lifecycle below.
+
+### Lifecycle
+
+Available is a live, computed eligibility result (`mission-eligibility.ts`'s `computeEligibleMissionCandidates`), never a persisted row. A Mission row is created only when a user explicitly starts one; from that point it moves Active → Completed → Archived. Completion is automatic and deterministic: every read recomputes each active mission's real progress, and any mission whose progress has genuinely reached its target is transitioned to Completed with a real `completedAt` in that same read — there is no background job, no manual "claim" step, and once completed a mission is never un-completed even if the underlying financial state later reverses.
+
+### Invariants
+
+- A mission's progress must always be computed live from the real domain (Goals, Budgets, Accounts, Transactions, or Confidence) it's tied to — never a second, independently-maintained calculation, and never inferred from unrelated activity.
+- A mission is never created, completed, or archived for any owner other than the authenticated owner.
+- Mission completion must never write to, or otherwise influence, a Confidence Score calculation — the Confidence Engine remains the sole authority for confidence math.
+- A mission is never hard-deleted; archiving is the only removal path, and prior completion history is permanent.
+- No XP, level, streak, badge, or reward value exists anywhere in this domain.
+
+### Implementation: Mission Engine V1
+
+Implemented in `src/db/schema/missions.ts`, `src/domains/missions/`, `src/application/missions/{mission-calculations.ts,mission-eligibility.ts,service.ts}`, `src/infrastructure/db/missions-repository.ts`, `src/composition/{missions-composition.ts,missions-query.ts}`, and `src/features/missions/actions.ts`.
+
+**No duplicated financial math.** Every mission type's progress reduces to reading another domain's own already-correct output: `GoalService.listGoalsWithProgress` (fund-emergency-fund, reach-savings-goal), `BudgetService.getBudgetPeriodSummary` (stay-within-budget), `AccountRepository` balances (reduce-debt), `TransactionRepository`'s `uncategorizedOnly` filter (categorize-transactions), and the Confidence Engine's own `computeCurrentConfidenceScore`/band thresholds (improve-confidence, read-only — injected into `MissionService` as a plain function rather than imported directly, to avoid the application layer depending on the composition layer).
+
+**Deterministic eligibility, not recommendation.** `mission-eligibility.ts` is a pure function over already-fetched real data — the same "deterministic, explainable selection, not a scoring formula" shape as `deriveUpcomingObjectives` in `goal-calculations.ts`. `MissionService.startMission` re-runs this exact check server-side before writing anything, so a client-held candidate list is never trusted as still valid.
+
+**Scope gap resolved before implementation, not invented around.** The commissioning task explicitly excluded gamification (XP/streaks/badges/leaderboards) and AI-generated missions, which conflicts directly with the full documented product vision. This was reported and resolved via four explicit decisions before any code was written — see `docs/adr/0006-mission-engine-v1-scope.md` for the full record, including the two genuine judgment calls it required (reduce-debt's payoff target, improve-confidence's next-band-up target) that no document defined.
+
+**Dashboard integration.** `getMissionsOverview` (the same function the `/missions` page calls) replaced the former hardcoded `missionStatus` mock in `features/dashboard/mock-data.ts` (removed).
 
 ---
 
@@ -1911,3 +1958,4 @@ These decisions shall be resolved through architecture design, implementation re
 | 1.0.0 | 2026-07-26 | Caitlin Gillum | Defined Athena's platform-neutral conceptual domain model, core financial domains, aggregate boundaries, relationships, events, state transitions, financial invariants, data classifications, and cross-domain rules. |
 | 1.1.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Account CRUD backend (Slice 2): active/archived lifecycle, archive vs. soft-delete distinction, ownership guarantees, and the `src/features/accounts/actions.ts` Server Action surface. |
 | 1.2.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Category CRUD backend (Slice 3), following a domain audit: canonical schema (no migration), two-level hierarchy enforcement, soft-delete-only lifecycle with restore intentionally omitted, ownership guarantees, and deferred presentation metadata. Records a fix to a cross-owner soft-delete false-success bug found during implementation. |
+| 1.3.0 | 2026-08-08 | Caitlin Gillum | Documented the implemented Mission Engine V1 backend: the Missions domain (deterministic, non-gamified subset of the aspirational product docs — see ADR-0006), its lifecycle, invariants, and no-duplicated-math implementation. Corrects two now-stale Confidence-section statements that predated Mission Engine's existence. |

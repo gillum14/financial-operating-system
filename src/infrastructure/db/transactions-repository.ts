@@ -35,6 +35,9 @@ export class DrizzleTransactionRepository implements TransactionRepository {
     if (filter?.categoryId) {
       conditions.push(eq(transactions.categoryId, filter.categoryId));
     }
+    if (filter?.uncategorizedOnly) {
+      conditions.push(isNull(transactions.categoryId));
+    }
     if (filter?.transactionType) {
       conditions.push(eq(transactions.transactionType, filter.transactionType));
     }

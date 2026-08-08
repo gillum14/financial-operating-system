@@ -18,6 +18,17 @@
 
 ---
 
+> **V1 Implementation Scope (2026-08-08):** Mission Engine V1 implements a
+> non-gamified, deterministic subset of this document — 6 mission types, a
+> 4-state lifecycle (`available`/`active`/`completed`/`archived`), and no
+> XP, levels, streaks, badges, celebrations, rewards, shared missions, or
+> mission recommendations. This document remains the aspirational product
+> vision; see
+> [`docs/adr/0006-mission-engine-v1-scope.md`](../adr/0006-mission-engine-v1-scope.md)
+> for what was actually built, why, and what remains deferred.
+
+---
+
 # Table of Contents
 
 1. Purpose
@@ -411,3 +422,4 @@ The Mission Engine transforms financial recommendations into purposeful action.
 | Version | Date       | Author         | Summary                                                                                                                                                                                                                                                    |
 | ------- | ---------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.0.0   | 2026-07-31 | Caitlin Gillum | Established the Mission Engine product specification, defining Athena's mission philosophy, lifecycle, mission categories, progress engine, rewards, milestones, celebrations, confidence integration, dashboard experience, and long-term product vision. |
+| 1.0.1   | 2026-08-08 | Caitlin Gillum | Added a V1 Implementation Scope note pointing to ADR-0006 — Mission Engine V1 implements a non-gamified, deterministic subset of this document; no content below was changed. |

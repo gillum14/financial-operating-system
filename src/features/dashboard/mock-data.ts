@@ -1,4 +1,4 @@
-import type { Account, ActivityItem, CashFlowPoint, CategorySpend, MissionStatusItem, StatSummary } from "./types";
+import type { Account, ActivityItem, CashFlowPoint, CategorySpend, StatSummary } from "./types";
 
 export const briefDate = {
   label: "May 29, 2026",
@@ -91,37 +91,6 @@ export const spendingByCategory: CategorySpend[] = [
 export const spendingTotal = 6620;
 export const spendingUpdatedLabel = "Updated 2 min ago";
 
-export const missionStatus: MissionStatusItem[] = [
-  {
-    id: "emergency-fund",
-    label: "Emergency Fund",
-    status: "On Track",
-    level: "on-track",
-    detail: "3.8 months",
-  },
-  {
-    id: "debt-paydown",
-    label: "Debt Paydown",
-    status: "Needs Attention",
-    level: "needs-attention",
-    detail: "$12,450 remaining",
-  },
-  {
-    id: "investments",
-    label: "Investments",
-    status: "On Track",
-    level: "on-track",
-    detail: "2.1% this month",
-  },
-  {
-    id: "budget-compliance",
-    label: "Budget Compliance",
-    status: "Needs Attention",
-    level: "needs-attention",
-    detail: "82% this month",
-  },
-];
-
 export const encouragementStatement = "You're making strong progress toward your financial goals.";
 
 export const dailyInsight = "Investments continue trending upward, up 2.23% this month.";
@@ -131,11 +100,7 @@ export const operationalHighlights: string[] = [
   "Net worth grew 2.01% ($8,125) over the last 30 days.",
 ];
 
-const priorityStatus = missionStatus.find((item) => item.level === "needs-attention");
-
-export const priorityAction = priorityStatus
-  ? `${priorityStatus.label} needs attention — ${priorityStatus.detail}.`
-  : "All mission-critical metrics are on track.";
+export const priorityAction = "Review your accounts and budget for anything that needs attention.";
 
 export const recentActivity: ActivityItem[] = [
   {

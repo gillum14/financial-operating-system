@@ -18,6 +18,19 @@
 
 ---
 
+> **V1 Implementation Scope (2026-08-08):** Mission Engine V1 implements a
+> non-gamified, deterministic subset of this document — 6 mission types, a
+> 4-state lifecycle (`available`/`active`/`completed`/`archived`, §5 below
+> is aspirational), and none of §9 Experience Points, §10 Levels, §12
+> Streaks and Theme Unlocks, §13 Repeatable Missions, §14's five-active-
+> mission limit, or §15 Household Missions. §17's Confidence Engine
+> separation IS fully implemented, structurally (Missions never computes
+> or duplicates a Confidence Score). See
+> [`docs/adr/0006-mission-engine-v1-scope.md`](../adr/0006-mission-engine-v1-scope.md)
+> for the full rationale and what remains deferred.
+
+---
+
 # Table of Contents
 
 1. Purpose
@@ -681,3 +694,4 @@ Future capabilities may include:
 | Version | Date       | Author         | Summary                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------- | ---------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-03 | Caitlin Gillum | Established the canonical Missions domain model, defining mission entities, lifecycle, sources, verification, progress tracking, universal XP, visible levels, personal rewards, streak-based theme unlocks, repeatable missions, provisional active-mission limits, household participation, relationships to Goals and the Confidence Engine, reward finality, safety rules, and future expansion. |
+| 1.0.1   | 2026-08-08 | Caitlin Gillum | Added a V1 Implementation Scope note pointing to ADR-0006 — Mission Engine V1 implements a non-gamified, deterministic subset of this document; no content below was changed. |
