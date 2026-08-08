@@ -56,16 +56,6 @@ export interface BudgetProgress {
   periodLabel: string;
 }
 
-export interface ConfidenceScore {
-  score: number;
-  label: string;
-}
-
-export interface ConfidenceTrend {
-  label: string;
-  value: number;
-}
-
 export interface MissionProgressItem {
   id: string;
   label: string;

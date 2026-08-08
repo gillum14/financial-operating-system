@@ -40,6 +40,8 @@ import type {
   GoalStatusUpdateInput,
   GoalUpdateInput,
 } from "@/domains/goals/types";
+import type { ConfidenceScoreSnapshotRepository } from "@/domains/confidence/repository";
+import type { ConfidenceScoreSnapshot, ConfidenceScoreSnapshotCreateInput } from "@/domains/confidence/types";
 import type { InstitutionRepository } from "@/domains/institutions/repository";
 import type { Institution, InstitutionCreateInput, InstitutionUpdateInput } from "@/domains/institutions/types";
 import type { AccountBalanceSnapshotRepository } from "@/domains/net-worth-history/repository";
@@ -709,6 +711,46 @@ export class FakeAccountBalanceSnapshotRepository implements AccountBalanceSnaps
     }
 
     return inserted;
+  }
+}
+
+// Insert-only, matching DrizzleConfidenceScoreSnapshotRepository — no
+// update/softDelete methods on the real interface either (this table is
+// genuinely immutable). create() replicates the real repository's
+// ON CONFLICT DO NOTHING semantics: a duplicate (ownerId, snapshotDate)
+// pair is silently skipped (returns null), never overwritten.
+export class FakeConfidenceScoreSnapshotRepository implements ConfidenceScoreSnapshotRepository {
+  private readonly rows = new Map<string, ConfidenceScoreSnapshot>();
+  private readonly byOwnerAndDate = new Set<string>();
+
+  async getByIdForOwner(id: string, ownerId: string): Promise<ConfidenceScoreSnapshot | null> {
+    const row = this.rows.get(id);
+    return row && row.ownerId === ownerId ? row : null;
+  }
+
+  async listForOwner(ownerId: string): Promise<ConfidenceScoreSnapshot[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.ownerId === ownerId)
+      .sort((a, b) => (a.snapshotDate < b.snapshotDate ? -1 : a.snapshotDate > b.snapshotDate ? 1 : 0));
+  }
+
+  async create(input: ConfidenceScoreSnapshotCreateInput): Promise<ConfidenceScoreSnapshot | null> {
+    const conflictKey = `${input.ownerId}:${input.snapshotDate}`;
+    if (this.byOwnerAndDate.has(conflictKey)) return null;
+
+    const row: ConfidenceScoreSnapshot = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      snapshotDate: input.snapshotDate,
+      overallScore: input.overallScore ?? null,
+      band: input.band ?? null,
+      pillarScores: input.pillarScores,
+      snapshotType: input.snapshotType ?? "manual",
+      createdAt: new Date(),
+    };
+    this.rows.set(row.id, row);
+    this.byOwnerAndDate.add(conflictKey);
+    return row;
   }
 }
 

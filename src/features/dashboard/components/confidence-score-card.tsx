@@ -1,15 +1,34 @@
 import { Gauge } from "lucide-react";
 
+import type { ConfidenceBandId } from "@/application/confidence/confidence-views";
+import type { ConfidenceOverviewView } from "@/composition/confidence-query";
 import Card from "@/components/ui/card";
-import type { ConfidenceScore, ConfidenceTrend } from "@/features/dashboard/types";
 
 type ConfidenceScoreCardProps = {
-  score: ConfidenceScore;
-  trends: ConfidenceTrend[];
+  overview: ConfidenceOverviewView;
   className?: string;
 };
 
-export function ConfidenceScoreCard({ score, trends, className = "" }: ConfidenceScoreCardProps) {
+// Exceptional/Strong read as genuinely good news; Stable/Building are
+// encouraging-neutral (confidence-engine.md: "labels are intentionally
+// encouraging rather than judgmental," not a pass/fail signal);
+// Vulnerable/At Risk are the only bands that warrant the danger tone —
+// still never red-alarming language, just an honest visual cue.
+const BAND_TONE: Record<ConfidenceBandId, string> = {
+  exceptional: "var(--success)",
+  strong: "var(--success)",
+  stable: "var(--primary)",
+  building: "var(--primary)",
+  vulnerable: "var(--warning)",
+  atRisk: "var(--danger)",
+};
+
+function formatSignedScore(value: number): string {
+  const rounded = Math.round(value);
+  return `${rounded >= 0 ? "+" : ""}${rounded}`;
+}
+
+export function ConfidenceScoreCard({ overview, className = "" }: ConfidenceScoreCardProps) {
   return (
     <Card className={className}>
       <div className="flex items-start justify-between">
@@ -22,23 +41,41 @@ export function ConfidenceScoreCard({ score, trends, className = "" }: Confidenc
         </span>
       </div>
 
-      <p className="mt-2 text-5xl font-bold tracking-tight text-[var(--foreground)]">{score.score}</p>
+      {!overview.hasEvidence || overview.overallScore === null || overview.band === null ? (
+        <>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--foreground-muted)]">—</p>
+          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+            Not enough data yet — add accounts, a budget, or goals to build your Confidence Score.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 text-5xl font-bold tracking-tight text-[var(--foreground)]">{overview.overallScore}</p>
 
-      <p className="mt-1 text-sm text-[var(--success)]">{score.label}</p>
+          <p className="mt-1 text-sm" style={{ color: BAND_TONE[overview.band.id] }}>
+            {overview.band.label}
+          </p>
 
-      <ul className="mt-4 space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
-        {trends.map((trend) => (
-          <li key={trend.label} className="flex items-center justify-between text-xs">
-            <span className="text-[var(--foreground-muted)]">{trend.label}</span>
-            <span
-              className={`font-medium ${trend.value >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}
-            >
-              {trend.value >= 0 ? "+" : ""}
-              {trend.value}
-            </span>
-          </li>
-        ))}
-      </ul>
+          <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
+            {overview.trend?.overallChange ? (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[var(--foreground-muted)]">vs {overview.trend.overallChange.comparisonDate}</span>
+                <span
+                  className={`font-medium ${overview.trend.overallChange.absoluteChange >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}
+                >
+                  {formatSignedScore(overview.trend.overallChange.absoluteChange)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--foreground-muted)]">
+                {overview.hasHistory
+                  ? "Trend unavailable for this period."
+                  : "First snapshot will establish your trend baseline."}
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </Card>
   );
 }

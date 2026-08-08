@@ -11,6 +11,7 @@ import {
   budgetAllocations,
   budgetPeriods,
   categories,
+  confidenceScoreSnapshots,
   dataProviderConnections,
   goalAllocations,
   goalContributions,
@@ -1609,6 +1610,112 @@ describe.skipIf(!hasDatabase)("Row Level Security policies (integration)", () =>
             balance: "1050.00",
             accountType: "checking",
             balanceSource: "manual",
+          });
+        }),
+        /duplicate key value violates unique constraint/,
+      );
+    });
+  });
+
+  describe("confidence_score_snapshots", () => {
+    it("User A can read own snapshots but not User B's", async () => {
+      await withRollback(db, async (tx) => {
+        const [snapshotA] = await tx
+          .insert(confidenceScoreSnapshots)
+          .values({ ownerId: USER_A_ID, snapshotDate: "2026-01-31", overallScore: 82, band: "Strong", pillarScores: { cashFlow: 80 } })
+          .returning();
+        const [snapshotB] = await tx
+          .insert(confidenceScoreSnapshots)
+          .values({ ownerId: USER_B_ID, snapshotDate: "2026-01-31", overallScore: 40, band: "Vulnerable", pillarScores: { cashFlow: 30 } })
+          .returning();
+
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const own = await tx.select().from(confidenceScoreSnapshots).where(eq(confidenceScoreSnapshots.id, snapshotA.id));
+        const other = await tx.select().from(confidenceScoreSnapshots).where(eq(confidenceScoreSnapshots.id, snapshotB.id));
+
+        expect(own).toHaveLength(1);
+        expect(other).toHaveLength(0);
+      });
+    });
+
+    it("User A can insert a snapshot with owner_id = self", async () => {
+      await withRollback(db, async (tx) => {
+        await runAsAuthenticatedUser(tx, USER_A_ID);
+        const [row] = await tx
+          .insert(confidenceScoreSnapshots)
+          .values({ ownerId: USER_A_ID, snapshotDate: "2026-01-31", overallScore: 82, band: "Strong", pillarScores: { cashFlow: 80 } })
+          .returning();
+        expect(row.ownerId).toBe(USER_A_ID);
+      });
+    });
+
+    it("User A cannot insert a snapshot owned by User B (cross-owner snapshot IDs fail closed)", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.insert(confidenceScoreSnapshots).values({
+            ownerId: USER_B_ID,
+            snapshotDate: "2026-01-31",
+            overallScore: 40,
+            band: "Vulnerable",
+            pillarScores: { cashFlow: 30 },
+          });
+        }),
+        /row-level security/,
+      );
+    });
+
+    // No UPDATE grant exists at all — this table is genuinely immutable
+    // (see the migration), matching account_balance_snapshots exactly.
+    it("User A cannot update their own snapshot's score — no UPDATE grant exists at all", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [snapshotA] = await tx
+            .insert(confidenceScoreSnapshots)
+            .values({ ownerId: USER_A_ID, snapshotDate: "2026-01-31", overallScore: 82, band: "Strong", pillarScores: { cashFlow: 80 } })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.update(confidenceScoreSnapshots).set({ overallScore: 100 }).where(eq(confidenceScoreSnapshots.id, snapshotA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    // No DELETE grant either — a Confidence Score snapshot has no
+    // legitimate post-creation edit or removal path in this version.
+    it("User A cannot delete their own snapshot — no DELETE grant, no ordinary hard-delete path", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          const [snapshotA] = await tx
+            .insert(confidenceScoreSnapshots)
+            .values({ ownerId: USER_A_ID, snapshotDate: "2026-01-31", overallScore: 82, band: "Strong", pillarScores: { cashFlow: 80 } })
+            .returning();
+
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.delete(confidenceScoreSnapshots).where(eq(confidenceScoreSnapshots.id, snapshotA.id));
+        }),
+        /permission denied/,
+      );
+    });
+
+    it("the unique (owner_id, snapshot_date) index rejects a duplicate insert, even as the authenticated role", async () => {
+      await expectDenied(
+        withRollback(db, async (tx) => {
+          await runAsAuthenticatedUser(tx, USER_A_ID);
+          await tx.insert(confidenceScoreSnapshots).values({
+            ownerId: USER_A_ID,
+            snapshotDate: "2026-01-31",
+            overallScore: 82,
+            band: "Strong",
+            pillarScores: { cashFlow: 80 },
+          });
+          await tx.insert(confidenceScoreSnapshots).values({
+            ownerId: USER_A_ID,
+            snapshotDate: "2026-01-31",
+            overallScore: 90,
+            band: "Strong",
+            pillarScores: { cashFlow: 90 },
           });
         }),
         /duplicate key value violates unique constraint/,

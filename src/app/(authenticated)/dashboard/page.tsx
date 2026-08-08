@@ -5,6 +5,7 @@ import ProgressBar from "@/components/ui/progress-bar";
 import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 import { getBudgetsOverview } from "@/composition/budgets-query";
+import { getConfidenceOverview } from "@/composition/confidence-query";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
 import { getGoalsOverview } from "@/composition/goals-query";
 import { getNetWorthOverview } from "@/composition/net-worth-query";
@@ -13,8 +14,6 @@ import { formatStatDelta } from "@/features/net-worth/format";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import type { BudgetProgress, MissionProgressItem } from "@/features/dashboard/types";
 import {
-  confidenceScore,
-  confidenceTrends,
   dailyInsight,
   encouragementStatement,
   missionStatus,
@@ -104,6 +103,11 @@ export default async function DashboardPage() {
   // snapshot yet, the tile falls back to the same honest "as of" caption
   // it always had, never a fabricated 0% or invented comparison.
   const netWorthOverview = await getNetWorthOverview(authUser.id);
+
+  // The one canonical Confidence calculation path (see composition/
+  // confidence-query.ts) — reuses Budgets/Goals/Net Worth's own real
+  // output rather than a second computation of any of that math.
+  const confidenceOverview = await getConfidenceOverview(authUser.id);
   const missionProgress: MissionProgressItem[] = (goalsOverview.goals ?? [])
     .filter((goal) => goal.status === "active")
     .slice(0, 4)
@@ -170,7 +174,7 @@ export default async function DashboardPage() {
           <FinancialBriefSummary highlights={operationalHighlights} priorityAction={priorityAction} />
         </div>
 
-        <ConfidenceScoreCard score={confidenceScore} trends={confidenceTrends} className="lg:w-64 shrink-0" />
+        <ConfidenceScoreCard overview={confidenceOverview} className="lg:w-64 shrink-0" />
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
