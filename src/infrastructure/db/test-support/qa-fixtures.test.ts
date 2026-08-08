@@ -197,6 +197,32 @@ describe.skipIf(!hasDatabase)("QaFixtureSet (integration)", () => {
     });
   });
 
+  it("creates and cleans up a mission, FK-safe against the goal it's tied to", async () => {
+    await withRollback(db, async (tx) => {
+      const owner = await createTestAuthUser(tx);
+      const fixtures = createQaFixtureSet(tx);
+
+      const goal = await fixtures.createGoal({
+        ownerId: owner.id,
+        title: "Emergency Fund",
+        targetAmount: "1000.00",
+        goalType: "emergency-fund",
+      });
+      await fixtures.createMission({
+        ownerId: owner.id,
+        missionType: "fund-emergency-fund",
+        title: "Fund \"Emergency Fund\"",
+        description: "Build your emergency fund toward its target.",
+        relatedGoalId: goal.id,
+      });
+
+      // goals.id is referenced by missions.related_goal_id (ON DELETE SET
+      // NULL, not RESTRICT — but reverse-order deletion still means the
+      // mission is gone before the goal it referenced is touched).
+      await expect(fixtures.cleanup()).resolves.toMatchObject({ totalTracked: 2 });
+    });
+  });
+
   it("is idempotent: a second cleanup() call on an empty ledger is a safe no-op", async () => {
     await withRollback(db, async (tx) => {
       const owner = await createTestAuthUser(tx);

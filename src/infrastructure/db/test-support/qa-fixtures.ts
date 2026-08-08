@@ -29,6 +29,7 @@ import {
   goalAllocations,
   goalContributions,
   goals,
+  missions,
   transactions,
   type Account,
   type AccountBalanceSnapshot,
@@ -40,6 +41,7 @@ import {
   type Goal,
   type GoalAllocation,
   type GoalContribution,
+  type Mission,
   type NewAccount,
   type NewAccountBalanceSnapshot,
   type NewBudgetAllocation,
@@ -50,6 +52,7 @@ import {
   type NewGoal,
   type NewGoalAllocation,
   type NewGoalContribution,
+  type NewMission,
   type NewTransaction,
   type Transaction,
 } from "@/db/schema";
@@ -69,6 +72,7 @@ const QA_FIXTURE_TABLES = {
   budget_allocation_adjustments: budgetAllocationAdjustments,
   confidence_score_snapshots: confidenceScoreSnapshots,
   account_balance_snapshots: accountBalanceSnapshots,
+  missions,
 } as const;
 
 export type QaFixtureTableName = keyof typeof QA_FIXTURE_TABLES;
@@ -173,6 +177,12 @@ export class QaFixtureSet {
   async createAccountBalanceSnapshot(input: NewAccountBalanceSnapshot): Promise<AccountBalanceSnapshot> {
     const [row] = await this.db.insert(accountBalanceSnapshots).values(input).returning();
     this.record("account_balance_snapshots", row.id);
+    return row;
+  }
+
+  async createMission(input: NewMission): Promise<Mission> {
+    const [row] = await this.db.insert(missions).values(input).returning();
+    this.record("missions", row.id);
     return row;
   }
 

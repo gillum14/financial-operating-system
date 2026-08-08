@@ -8,18 +8,13 @@ import { getBudgetsOverview } from "@/composition/budgets-query";
 import { getConfidenceOverview } from "@/composition/confidence-query";
 import { getDashboardSnapshot } from "@/composition/dashboard-query";
 import { getGoalsOverview } from "@/composition/goals-query";
+import { getMissionsOverview } from "@/composition/missions-query";
 import { getNetWorthOverview } from "@/composition/net-worth-query";
 import { getUserProfile } from "@/composition/user-profile";
 import { formatStatDelta } from "@/features/net-worth/format";
 import { requireAuthenticatedUser } from "@/lib/auth/authenticated-user";
 import type { BudgetProgress, MissionProgressItem } from "@/features/dashboard/types";
-import {
-  dailyInsight,
-  encouragementStatement,
-  missionStatus,
-  operationalHighlights,
-  priorityAction,
-} from "@/features/dashboard/mock-data";
+import { dailyInsight, encouragementStatement, operationalHighlights, priorityAction } from "@/features/dashboard/mock-data";
 import { ConfidenceScoreCard } from "@/features/dashboard/components/confidence-score-card";
 import { FinancialBriefSummary } from "@/features/dashboard/components/financial-brief-summary";
 import { MissionProgress } from "@/features/dashboard/components/mission-progress";
@@ -68,10 +63,12 @@ export default async function DashboardPage() {
   const profile = await getUserProfile(authUser.id);
   const firstName = (profile?.displayName ?? authUser.email).split(" ")[0];
 
-  // Sections still sourced from mock data (Confidence Engine and Mission
-  // Status aren't implemented yet — out of scope for this slice) are wired
-  // below unchanged; everything else, including Budget Status/Progress and
-  // Upcoming Objectives below, comes from real composition queries.
+  // Everything on this page is real, composition-layer data — Confidence
+  // Engine (getConfidenceOverview) and Mission Engine (getMissionsOverview)
+  // included. The only remaining mock-data.ts imports left below
+  // (encouragementStatement/dailyInsight/operationalHighlights/
+  // priorityAction) are presentational copy with no backing calculation
+  // domain yet, not fabricated numbers.
   //
   // Recent Activity is a compact widget, not the full ledger — "View all"
   // is the entry point to the complete history. Uses DashboardService's
@@ -108,6 +105,11 @@ export default async function DashboardPage() {
   // confidence-query.ts) — reuses Budgets/Goals/Net Worth's own real
   // output rather than a second computation of any of that math.
   const confidenceOverview = await getConfidenceOverview(authUser.id);
+
+  // The one canonical Mission calculation path (see composition/
+  // missions-query.ts) — Mission Status below renders these real active
+  // missions directly, never a second progress calculation.
+  const missionsOverview = await getMissionsOverview(authUser.id);
   const missionProgress: MissionProgressItem[] = (goalsOverview.goals ?? [])
     .filter((goal) => goal.status === "active")
     .slice(0, 4)
@@ -246,7 +248,7 @@ export default async function DashboardPage() {
             />
           </div>
 
-          <MissionStatus items={missionStatus} />
+          <MissionStatus missions={missionsOverview.active} />
         </div>
 
         <div className="space-y-6">

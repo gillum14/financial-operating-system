@@ -18,6 +18,18 @@
 
 ---
 
+> **V1 Implementation Scope (2026-08-08):** Mission Engine V1 implements a
+> non-gamified, deterministic subset of this document — 6 mission types
+> (stay within budget, fund an emergency fund, reach a savings goal,
+> categorize transactions, reduce debt, improve confidence), a 4-state
+> lifecycle (`available`/`active`/`completed`/`archived`, §6 below is
+> aspirational), and none of §19 Product Decisions' Experience Points,
+> Levels, Theme Unlocks, Household Missions, or Custom Missions. See
+> [`docs/adr/0006-mission-engine-v1-scope.md`](../adr/0006-mission-engine-v1-scope.md)
+> for the full rationale and what remains deferred.
+
+---
+
 # Table of Contents
 
 1. Purpose
@@ -864,3 +876,4 @@ Refer to the Confidence Engine specification for formulas, weighting, dimensions
 | Version | Date       | Author         | Summary                                                                                                                                                                                                                                                                                                                           |
 | ------- | ---------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.0.0   | 2026-08-03 | Caitlin Gillum | Established the Missions product specification, defining mission philosophy, types, lifecycle, eligibility, progress tracking, completion rules, rewards, streaks, difficulty, user experience, relationships to Goals and the Confidence Engine, personalization, safety principles, future roadmap, and open product decisions. |
+| 1.0.1   | 2026-08-08 | Caitlin Gillum | Added a V1 Implementation Scope note pointing to ADR-0006 — Mission Engine V1 implements a non-gamified, deterministic subset of this document; no content below was changed. |

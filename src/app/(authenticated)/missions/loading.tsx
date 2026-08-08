@@ -11,8 +11,8 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 function RailSkeleton() {
   return (
     <>
-      <SkeletonBlock className="h-24" />
-      <SkeletonBlock className="h-24" />
+      <SkeletonBlock className="h-40" />
+      <SkeletonBlock className="h-32" />
       <SkeletonBlock className="h-24" />
     </>
   );
@@ -26,22 +26,21 @@ export default function MissionsLoading() {
         <SkeletonBlock className="h-24 lg:w-96" />
       </div>
 
-      {/* Same RAIL_GRID_COLS as the real page: the tabs + metrics
+      {/* Same RAIL_GRID_COLS row as the real page: the tabs + metrics
           skeleton is confined to the left column, and the rail skeleton
           starts at the very top, beside the tabs. */}
       <div className={`${RAIL_GRID_COLS} items-start`}>
         <div className="space-y-6">
           <SkeletonBlock className="h-10" />
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-4">
             <SkeletonBlock className="h-28" />
             <SkeletonBlock className="h-28" />
             <SkeletonBlock className="h-28" />
             <SkeletonBlock className="h-28" />
           </div>
-          <SkeletonBlock className="h-64" />
-          <SkeletonBlock className="h-40" />
-          <SkeletonBlock className="h-40" />
-          <SkeletonBlock className="h-20" />
+          <SkeletonBlock className="h-48" />
+          <SkeletonBlock className="h-48" />
+          <SkeletonBlock className="h-48" />
         </div>
         <div className="hidden space-y-4 min-[1360px]:block">
           <RailSkeleton />

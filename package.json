@@ -12,7 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=.env.local node_modules/.bin/tsx src/db/seed/index.ts",
     "test": "vitest run",
-    "test:db": "ALLOW_DB_TESTS=true node --env-file=.env.local node_modules/.bin/vitest run --no-file-parallelism src/infrastructure/db/*.test.ts src/infrastructure/db/test-support/qa-fixtures.test.ts src/composition/dashboard-composition.test.ts src/composition/accounts-composition.test.ts src/composition/budgets-composition.test.ts src/composition/goals-composition.test.ts src/composition/net-worth-composition.test.ts src/composition/dashboard-net-worth-consistency.test.ts src/composition/confidence-composition.test.ts src/lib/supabase/rls-policies.jwt.test.ts",
+    "test:db": "ALLOW_DB_TESTS=true node --env-file=.env.local node_modules/.bin/vitest run --no-file-parallelism src/infrastructure/db/*.test.ts src/infrastructure/db/test-support/qa-fixtures.test.ts src/application/missions/service.test.ts src/composition/dashboard-composition.test.ts src/composition/accounts-composition.test.ts src/composition/budgets-composition.test.ts src/composition/goals-composition.test.ts src/composition/net-worth-composition.test.ts src/composition/dashboard-net-worth-consistency.test.ts src/composition/confidence-composition.test.ts src/composition/missions-composition.test.ts src/lib/supabase/rls-policies.jwt.test.ts",
     "test:full": "npm run test && npm run test:db"
   },
   "dependencies": {
