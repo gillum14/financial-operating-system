@@ -10,6 +10,13 @@ import {
   selectComparisonSnapshot,
   type StoredConfidenceSnapshot,
 } from "@/application/confidence/confidence-history-calculations";
+import {
+  buildScoreExplanation,
+  computeCompleteness,
+  selectNegativeSignals,
+  selectPositiveSignals,
+  toHistoryPoint,
+} from "@/application/confidence/confidence-presentation";
 import type { ConfidenceOverviewView } from "@/application/confidence/confidence-views";
 import { db } from "@/db/client";
 import { DrizzleAccountRepository } from "@/infrastructure/db/accounts-repository";
@@ -98,6 +105,12 @@ export async function getConfidenceOverview(ownerId: string): Promise<Confidence
   const comparison = selectComparisonSnapshot(storedSnapshots);
   const trend = computeConfidenceTrend(result, comparison);
 
+  // Every derivation below reads result.pillars (already computed by
+  // computeConfidenceScore above) or storedSnapshots (already fetched
+  // above) — no new calculation, no new query. See confidence-
+  // presentation.ts's module comment.
+  const history = storedSnapshots.map((snapshot) => toHistoryPoint(snapshot.snapshotDate, snapshot.overallScore));
+
   return {
     hasEvidence: result.overallScore !== null,
     overallScore: result.overallScore,
@@ -106,5 +119,10 @@ export async function getConfidenceOverview(ownerId: string): Promise<Confidence
     asOfLabel: asOf.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
     hasHistory: comparison !== null,
     trend,
+    history,
+    completeness: computeCompleteness(result.pillars),
+    positiveSignals: selectPositiveSignals(result.pillars),
+    negativeSignals: selectNegativeSignals(result.pillars),
+    explanation: buildScoreExplanation(result.overallScore, result.band, result.pillars),
   };
 }

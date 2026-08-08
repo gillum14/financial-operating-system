@@ -83,4 +83,62 @@ describe.skipIf(!hasDatabase)("confidence composition root (integration)", () =>
     expect(overview.band).toEqual(result.band);
     expect(overview.hasEvidence).toBe(result.overallScore !== null);
   });
+
+  // Confidence Insights V1 — presentation-layer fields (completeness,
+  // positive/negative contributors, explanation, history) reconciled
+  // against the real seeded sandbox, not a hand-typed fixture. Every
+  // assertion here traces back to result.pillars — the exact same object
+  // getConfidenceOverview's other fields (asserted above) are built from,
+  // proving the presentation layer never recomputes anything.
+  it.skipIf(!seedOwnerId)("completeness reflects the real pillar availability for the seeded owner", async () => {
+    const { getConfidenceOverview } = await import("./confidence-query");
+
+    const overview = await getConfidenceOverview(seedOwnerId as string);
+    const availableCount = overview.pillars.filter((p) => p.status === "available").length;
+
+    expect(overview.completeness.totalPillars).toBe(8);
+    expect(overview.completeness.availablePillars).toBe(availableCount);
+    expect(overview.completeness.unavailablePillars).toHaveLength(8 - availableCount);
+    expect(overview.completeness.coveredWeightPercent).toBeGreaterThan(0);
+    expect(overview.completeness.coveredWeightPercent).toBeLessThanOrEqual(100);
+  });
+
+  it.skipIf(!seedOwnerId)("positive and negative contributors are drawn from the real pillar signals, correctly polarized", async () => {
+    const { getConfidenceOverview } = await import("./confidence-query");
+
+    const overview = await getConfidenceOverview(seedOwnerId as string);
+    const allSignalIds = new Set(overview.pillars.flatMap((p) => p.signals.map((s) => s.id)));
+
+    expect(overview.positiveSignals.every((s) => s.polarity === "positive")).toBe(true);
+    expect(overview.negativeSignals.every((s) => s.polarity === "negative")).toBe(true);
+    // Every contributor signal must trace back to a real pillar signal —
+    // never a fabricated one.
+    for (const signal of [...overview.positiveSignals, ...overview.negativeSignals]) {
+      expect(allSignalIds.has(signal.id)).toBe(true);
+    }
+  });
+
+  it.skipIf(!seedOwnerId)("the score explanation names a real pillar label from the result", async () => {
+    const { getConfidenceOverview } = await import("./confidence-query");
+
+    const overview = await getConfidenceOverview(seedOwnerId as string);
+    expect(overview.explanation).not.toBeNull();
+
+    const availableLabels = overview.pillars.filter((p) => p.status === "available").map((p) => p.label);
+    expect(availableLabels.some((label) => overview.explanation!.includes(label))).toBe(true);
+  });
+
+  // A real manual capture was performed against this owner during
+  // Confidence Engine V1's live verification, so the seeded sandbox
+  // already has real history to exercise the timeline here.
+  it.skipIf(!seedOwnerId)("history reflects the real persisted snapshots for the seeded owner, oldest first", async () => {
+    const { getConfidenceOverview } = await import("./confidence-query");
+
+    const overview = await getConfidenceOverview(seedOwnerId as string);
+    expect(overview.hasHistory).toBe(true);
+    expect(overview.history.length).toBeGreaterThan(0);
+
+    const dates = overview.history.map((point) => point.snapshotDate);
+    expect(dates).toEqual([...dates].sort());
+  });
 });
