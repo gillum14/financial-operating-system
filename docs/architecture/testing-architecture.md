@@ -348,6 +348,13 @@ Production tests must never modify real financial records.
 > by owner ID alone instead of by the specific rows it created, wiping
 > real seeded data on the shared dev database. Full writeup, root cause,
 > and safeguards: [`docs/testing.md`](../testing.md).
+>
+> **Incident (Confidence Insights V1, 2026-08-07):** the same class of
+> mistake recurred outside the automated suite — an ad-hoc live-QA cleanup
+> script deleted rows by owner ID, wiping unrelated pre-existing categories
+> for the same test identity. The structural fix,
+> [`QaFixtureSet`](../testing.md#live-qa-fixture-safety), is now the only
+> sanctioned way to create and clean up temporary rows during live QA.
 
 DB-backed tests shall:
 
@@ -359,6 +366,12 @@ DB-backed tests shall:
 - Scope every write and every cleanup step to the exact rows a test
   created, never to a broader match (owner, table, or otherwise) that
   could reach rows the test didn't create.
+
+Live QA verification (manual, browser-driven sessions against a real dev
+database) is held to the same last rule — see
+[`QaFixtureSet`](../testing.md#live-qa-fixture-safety), which makes it
+structurally impossible to clean up by anything other than the exact rows
+a session created.
 
 See `docs/testing.md` for the exact commands (`npm run test:db`,
 `npm run test:full`) and the guard implementation

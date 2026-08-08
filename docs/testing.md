@@ -197,6 +197,60 @@ never a blanket owner-ID match. See the file for the full change.
    migrations, separate from the app's pooled `DATABASE_URL`.
 6. **This document** and warnings in `.env.example`.
 
+---
+
+## Live QA fixture safety
+
+A second, related incident (Confidence Insights V1, 2026-08-07) happened
+outside the automated test suite entirely: during manual live-QA cleanup —
+a real browser session logged in as `SUPABASE_TEST_USER_A`, against the
+real dev Supabase database via an ad-hoc Node script — an
+`DELETE FROM categories WHERE owner_id = ownerId`, intended to remove one
+temporary verification row, deleted 5 unrelated, pre-existing categories
+for that same owner. Same root cause as the 2026-08-06 incident above
+(scoping a cleanup delete by owner instead of by the exact rows created),
+different call site (a one-off ad-hoc script, not a committed test file).
+See `docs/development-seed-baseline.md`'s "Correction (Confidence Insights
+V1, 2026-08-07)" note for the full writeup.
+
+**`QaFixtureSet`** (`src/infrastructure/db/test-support/qa-fixtures.ts`) is
+the structural fix, and is now the *only* sanctioned way to create and
+clean up temporary rows during live QA — whether in a DB-backed test file
+or in an ad-hoc verification script:
+
+```ts
+import { createQaFixtureSet } from "@/infrastructure/db/test-support/qa-fixtures";
+
+const fixtures = createQaFixtureSet(db); // real db, or a test tx
+const category = await fixtures.createCategory({ ownerId, name: "Verification Groceries" });
+// ...browser-driven verification against `category`...
+await fixtures.cleanup(); // deletes exactly this category, nothing else
+```
+
+Every `createX()` method (categories, accounts, transactions, goals, goal
+contributions, goal allocations, budget periods/allocations/adjustments,
+confidence score snapshots, account balance snapshots) records the exact
+row it inserted. `trackExisting(table, id)` covers a row created outside
+the helper (e.g. through a real server action during a browser session)
+that still needs cleanup — it still takes one specific table and one
+specific id, never a filter.
+
+**`cleanup()` takes no arguments.** There is no method on `QaFixtureSet`
+that accepts an owner id, an email, or any other broad filter — it is not
+possible to construct a call through this API that deletes more than what
+this instance tracked. `cleanup()` deletes in the exact reverse of
+creation/tracking order, which is FK-safe by construction (a row can only
+reference something that already exists, so whatever it depends on was
+always tracked earlier), and is safe to call more than once — an emptied
+or partially-drained ledger is a no-op, and deleting an already-deleted id
+is a no-op at the SQL level too.
+
+Any future ad-hoc QA cleanup script should go through `QaFixtureSet`
+rather than writing a fresh raw `DELETE ... WHERE owner_id = ...` — that
+pattern is exactly what caused both incidents on this page. See
+`src/infrastructure/db/test-support/qa-fixtures.test.ts` for the
+regression test proving an untracked, same-owner row survives cleanup.
+
 ### What remains unconfirmed
 
 - The exact PgBouncer transaction-pooler mechanism suspected before the

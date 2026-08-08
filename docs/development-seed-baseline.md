@@ -176,7 +176,11 @@ exists so a future reader doesn't mistake the drop for an unexplained
 anomaly. Lesson applied going forward: any cleanup of temporarily-inserted
 verification data must delete by specific row id, never by a shared
 `owner_id` that could also match pre-existing, non-owned-by-this-session
-rows.
+rows. This is now enforced structurally, not just by convention: see
+`QaFixtureSet` in
+[`docs/testing.md`](./testing.md#live-qa-fixture-safety) — its `cleanup()`
+has no way to accept anything broader than the exact rows a QA session
+tracked.
 
 ## Reproducing this baseline
 
