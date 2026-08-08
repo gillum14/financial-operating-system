@@ -2,13 +2,13 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-// Overview and Rewards are the two real views this page has; the other
-// three tabs stay disabled (dedicated Active/Completed/History views
-// aren't built) rather than silently doing nothing on click, which would
-// look broken instead of honestly not-yet-available. Switching between
-// Overview/Rewards never gates or hides the real Active/Available/
-// Completed sections underneath — those still render unconditionally
-// inside whichever panel owns them.
+// Overview, Rewards, and History are the three real views this page has;
+// Active/Completed stay disabled (no dedicated views for those yet, and
+// out of scope for the History tab build) rather than silently doing
+// nothing on click, which would look broken instead of honestly
+// not-yet-available. Switching tabs never gates or hides the real
+// Active/Available/Completed sections underneath — those still render
+// unconditionally inside the Overview panel that owns them.
 //
 // Nested inside the left column only (missions/page.tsx), which sits in
 // the same items-start grid row as the right rail — the rail's own
@@ -21,7 +21,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 // That measurement assumed a bordered tab button, so both real tabs below
 // keep an always-present `border-b-2` (transparent when unselected) to
 // preserve the exact height this offset was measured against.
-export type MissionsTabKey = "overview" | "rewards";
+export type MissionsTabKey = "overview" | "rewards" | "history";
 
 interface MissionsTabsContextValue {
   activeTab: MissionsTabKey;
@@ -43,7 +43,7 @@ export function useMissionsTabs(): MissionsTabsContextValue {
   return ctx;
 }
 
-const DISABLED_TABS = ["Active", "Completed", "History"] as const;
+const DISABLED_TABS = ["Active", "Completed"] as const;
 
 function tabButtonClassName(isActive: boolean): string {
   return `border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
@@ -53,7 +53,15 @@ function tabButtonClassName(isActive: boolean): string {
   }`;
 }
 
-export function MissionsTabs({ overviewPanel, rewardsPanel }: { overviewPanel: ReactNode; rewardsPanel: ReactNode }) {
+export function MissionsTabs({
+  overviewPanel,
+  rewardsPanel,
+  historyPanel,
+}: {
+  overviewPanel: ReactNode;
+  rewardsPanel: ReactNode;
+  historyPanel: ReactNode;
+}) {
   const [activeTab, setActiveTab] = useState<MissionsTabKey>("overview");
 
   return (
@@ -66,6 +74,9 @@ export function MissionsTabs({ overviewPanel, rewardsPanel }: { overviewPanel: R
           <button type="button" onClick={() => setActiveTab("rewards")} className={tabButtonClassName(activeTab === "rewards")}>
             Rewards
           </button>
+          <button type="button" onClick={() => setActiveTab("history")} className={tabButtonClassName(activeTab === "history")}>
+            History
+          </button>
           {DISABLED_TABS.map((tab) => (
             <span
               key={tab}
@@ -77,7 +88,11 @@ export function MissionsTabs({ overviewPanel, rewardsPanel }: { overviewPanel: R
           ))}
         </div>
 
-        <div className="mt-6">{activeTab === "overview" ? overviewPanel : rewardsPanel}</div>
+        <div className="mt-6">
+          {activeTab === "overview" && overviewPanel}
+          {activeTab === "rewards" && rewardsPanel}
+          {activeTab === "history" && historyPanel}
+        </div>
       </div>
     </MissionsTabsContext.Provider>
   );

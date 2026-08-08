@@ -4,6 +4,7 @@ import { ActiveMissionsCard } from "@/features/missions/components/active-missio
 import { AvailableMissionsCard } from "@/features/missions/components/available-missions-card";
 import { CompletedMissionsCard } from "@/features/missions/components/completed-missions-card";
 import { DailyMissionCard } from "@/features/missions/components/daily-mission-card";
+import { HistoryTabPanel } from "@/features/missions/components/history-tab-panel";
 import { MissionImpactCard } from "@/features/missions/components/mission-impact-card";
 import { MissionsHeader } from "@/features/missions/components/missions-header";
 import { MissionsSummaryMetrics } from "@/features/missions/components/missions-summary-metrics";
@@ -50,6 +51,7 @@ export default async function MissionsPage() {
               </div>
             }
             rewardsPanel={<RewardsTabPanel progression={overview.progression} />}
+            historyPanel={<HistoryTabPanel history={overview.history} />}
           />
         </div>
 

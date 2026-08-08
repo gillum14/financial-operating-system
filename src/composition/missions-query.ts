@@ -3,11 +3,13 @@ import "server-only";
 import { MISSION_TYPE_PILLAR, type MissionProgress } from "@/application/missions/mission-calculations";
 import type { MissionCandidate } from "@/application/missions/mission-eligibility";
 import { DAILY_MISSION_BONUS_XP, computeMissionXpValue } from "@/application/missions/progression-calculations";
-import type { MissionProgressionOverview } from "@/application/missions/progression-service";
+import type { MissionProgressionOverview, UnlockedMissionReward } from "@/application/missions/progression-service";
 import type { MissionWithProgress } from "@/application/missions/service";
 import type {
   LockedMissionRewardRow,
   MissionCandidateRow,
+  MissionHistoryDayGroup,
+  MissionHistoryEventKind,
   MissionImpactSummary,
   MissionProgressionView,
   MissionRewardRow,
@@ -15,7 +17,7 @@ import type {
   MissionsOverviewView,
 } from "@/application/missions/missions-views";
 import { PILLAR_LABELS } from "@/application/confidence/confidence-calculations";
-import { computeRewardProgress, REWARD_DEFINITIONS } from "@/application/missions/progression-calculations";
+import { computeLevel, computeRewardProgress, REWARD_DEFINITIONS } from "@/application/missions/progression-calculations";
 import type { MissionRewardKey } from "@/domains/mission-progression/types";
 import type { Mission, MissionType } from "@/domains/missions/types";
 
@@ -186,6 +188,113 @@ function toProgressionView(overview: MissionProgressionOverview): MissionProgres
   };
 }
 
+interface RawHistoryEvent {
+  kind: MissionHistoryEventKind;
+  id: string;
+  timestamp: Date;
+  title: string;
+  detail: string | null;
+}
+
+function timeLabelFor(date: Date): string {
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// The History tab's entire event log, built once here from data this
+// query already has in hand — no new repository reads. Every event kind
+// traces back to something already persisted (a mission's own
+// completedAt, or the immutable mission_rewards unlock ledger) except
+// level-ups, which have no row of their own anywhere: they're replayed
+// from each completion's XP contribution through the same canonical
+// computeLevel() progression-calculations.ts uses for the Level stat
+// tile, never a second leveling formula. "Do not duplicate progression
+// logic in the frontend" is satisfied the same way the Rewards tab
+// satisfies it — all of this runs here, server-side; the component only
+// renders the finished rows.
+function buildHistoryEvents(missionsWithProgress: MissionWithProgress[], unlockedRewards: UnlockedMissionReward[]): MissionHistoryDayGroup[] {
+  const events: RawHistoryEvent[] = [];
+
+  // Oldest-first for now — needed below to replay level-ups in the order
+  // they actually happened; re-sorted newest-first once every event kind
+  // has been collected.
+  const completedMissions = missionsWithProgress
+    .map((entry) => entry.mission)
+    .filter((mission): mission is Mission & { completedAt: Date } => mission.completedAt !== null)
+    .sort((a, b) => a.completedAt.getTime() - b.completedAt.getTime());
+
+  // One event per completion, XP included in its own detail line — a
+  // completed mission and the XP it earned are the same real event (see
+  // MissionProgressionService.recordMissionCompletion's exactly-once XP
+  // event), never split into two feed entries for one thing.
+  for (const mission of completedMissions) {
+    events.push({
+      kind: "mission-completed",
+      id: `mission:${mission.id}`,
+      timestamp: mission.completedAt,
+      title: `Completed "${mission.title}"`,
+      detail: xpLabelFor(mission.xpValue, mission.isDailyMission),
+    });
+  }
+
+  for (const reward of unlockedRewards) {
+    const definition = REWARD_DEFINITION_BY_KEY.get(reward.key);
+    events.push({
+      kind: "reward-unlocked",
+      id: `reward:${reward.key}`,
+      timestamp: reward.unlockedAt,
+      title: `Unlocked "${definition?.title ?? reward.key}"`,
+      detail: definition?.description ?? null,
+    });
+  }
+
+  // Replays totalXp forward, one completion at a time, and emits a
+  // level-up event for every level boundary that completion's XP
+  // crossed — a while loop rather than a single if, since a single
+  // completion crossing more than one level at once is possible in
+  // principle (a future, larger XP value) even though no current
+  // mission's XP is large enough to do that today.
+  let cumulativeXp = 0;
+  let currentLevel = computeLevel(0).level;
+  for (const mission of completedMissions) {
+    cumulativeXp += mission.xpValue + (mission.isDailyMission ? DAILY_MISSION_BONUS_XP : 0);
+    const newLevel = computeLevel(cumulativeXp).level;
+    while (currentLevel < newLevel) {
+      currentLevel += 1;
+      events.push({
+        kind: "level-up",
+        id: `level:${currentLevel}`,
+        timestamp: mission.completedAt,
+        title: `Reached Level ${currentLevel}`,
+        detail: `${cumulativeXp.toLocaleString("en-US")} XP total`,
+      });
+    }
+  }
+
+  events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  const groups: MissionHistoryDayGroup[] = [];
+  let currentDayKey: string | null = null;
+  let currentGroup: MissionHistoryDayGroup | null = null;
+
+  for (const event of events) {
+    const dayKey = event.timestamp.toISOString().slice(0, 10);
+    if (dayKey !== currentDayKey) {
+      currentDayKey = dayKey;
+      currentGroup = { dateLabel: formatDateTimeLabel(event.timestamp), events: [] };
+      groups.push(currentGroup);
+    }
+    currentGroup!.events.push({
+      id: event.id,
+      kind: event.kind,
+      title: event.title,
+      detail: event.detail,
+      timeLabel: timeLabelFor(event.timestamp),
+    });
+  }
+
+  return groups;
+}
+
 export async function getMissionsOverview(ownerId: string): Promise<MissionsOverviewView> {
   const missionService = getMissionService();
   const progressionService = getMissionProgressionService();
@@ -225,5 +334,6 @@ export async function getMissionsOverview(ownerId: string): Promise<MissionsOver
     archived,
     impactSummary: computeImpactSummary(missionsWithProgress),
     progression: toProgressionView(progressionOverview),
+    history: buildHistoryEvents(missionsWithProgress, progressionOverview.unlockedRewards),
   };
 }

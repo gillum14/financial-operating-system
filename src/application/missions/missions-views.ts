@@ -92,6 +92,37 @@ export interface MissionProgressionView {
   lockedRewards: LockedMissionRewardRow[];
 }
 
+// The three kinds of activity the History tab shows — deliberately not
+// a separate "XP earned" kind: every mission completion carries exactly
+// one XP award (see MissionProgressionService.recordMissionCompletion's
+// unique-per-mission XP event), so folding the XP into the completion
+// entry's own detail line is the real event, not two events for one
+// thing. "level-up" is the one kind with no row of its own anywhere —
+// see missions-query.ts's buildHistoryEvents for how it's derived, never
+// stored.
+export type MissionHistoryEventKind = "mission-completed" | "reward-unlocked" | "level-up";
+
+export interface MissionHistoryEventRow {
+  id: string;
+  kind: MissionHistoryEventKind;
+  // e.g. 'Completed "Categorize Your Transactions"' / 'Unlocked "Momentum"' / "Reached Level 2".
+  title: string;
+  // e.g. "+50 XP", a reward's own description, or a running XP total for
+  // a level-up — null when a kind has nothing further to say.
+  detail: string | null;
+  // e.g. "2:14 PM" — the date itself is the enclosing group's dateLabel,
+  // never repeated per-event.
+  timeLabel: string;
+}
+
+// One calendar day's worth of activity, newest day first (and newest
+// event first within the day) — the grouping this system uses instead of
+// a flat, repetitive list, per "group repeated events cleanly."
+export interface MissionHistoryDayGroup {
+  dateLabel: string;
+  events: MissionHistoryEventRow[];
+}
+
 // Aggregated entirely from the owner's own completed missions' own real,
 // recorded start/current values (see missions-query.ts's
 // computeImpactSummary) — never a re-attribution of unrelated Transactions/
@@ -114,4 +145,5 @@ export interface MissionsOverviewView {
   archived: MissionRow[];
   impactSummary: MissionImpactSummary;
   progression: MissionProgressionView;
+  history: MissionHistoryDayGroup[];
 }
