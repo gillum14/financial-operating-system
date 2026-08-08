@@ -8,6 +8,7 @@ import { MissionImpactCard } from "@/features/missions/components/mission-impact
 import { MissionsHeader } from "@/features/missions/components/missions-header";
 import { MissionsSummaryMetrics } from "@/features/missions/components/missions-summary-metrics";
 import { MissionsTabs } from "@/features/missions/components/missions-tabs";
+import { RewardsTabPanel } from "@/features/missions/components/rewards-tab-panel";
 import { UpcomingRewardsCard } from "@/features/missions/components/upcoming-rewards-card";
 import { RAIL_GRID_COLS } from "@/lib/page-grid";
 
@@ -39,14 +40,17 @@ export default async function MissionsPage() {
           of this row moving. */}
       <div className={`${RAIL_GRID_COLS} items-start`}>
         <div className="min-w-0">
-          <MissionsTabs>
-            <div className="space-y-6">
-              <MissionsSummaryMetrics progression={overview.progression} />
-              <ActiveMissionsCard missions={overview.active} />
-              <AvailableMissionsCard topCandidates={overview.topCandidates} allCandidates={overview.candidates} />
-              <CompletedMissionsCard missions={overview.completed} />
-            </div>
-          </MissionsTabs>
+          <MissionsTabs
+            overviewPanel={
+              <div className="space-y-6">
+                <MissionsSummaryMetrics progression={overview.progression} />
+                <ActiveMissionsCard missions={overview.active} />
+                <AvailableMissionsCard topCandidates={overview.topCandidates} allCandidates={overview.candidates} />
+                <CompletedMissionsCard missions={overview.completed} />
+              </div>
+            }
+            rewardsPanel={<RewardsTabPanel progression={overview.progression} />}
+          />
         </div>
 
         <aside className="hidden space-y-4 min-[1360px]:block">
