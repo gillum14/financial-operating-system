@@ -39,6 +39,7 @@
 - [Net Worth](#net-worth)
 - [Financial Goals](#financial-goals)
 - [Reporting](#reporting)
+- [Confidence](#confidence)
 - [Dashboard Configuration](#dashboard-configuration)
 - [Legal Expenses](#legal-expenses)
 - [Medical Expenses](#medical-expenses)
@@ -1216,6 +1217,57 @@ Potential reports include:
 - Report results must respect authorization.
 - Generated exports must not include unauthorized or unnecessary sensitive fields.
 - Cached reports must define freshness and invalidation behavior.
+
+---
+
+## Confidence
+
+The Confidence domain measures a user's overall financial preparedness, resilience, and trajectory — not wealth, income, or credit score alone. See `docs/products/confidence-engine.md` for the full product philosophy and the authoritative pillar/weight/band definitions this domain implements.
+
+### Primary Entity
+
+#### Confidence Score
+
+A Confidence Score represents overall financial confidence at a point in time.
+
+It may include:
+
+- Owner
+- Overall score (0-100)
+- Confidence level/band
+- Pillar scores
+- Contributing evidence (reason codes)
+- Calculation timestamp
+
+### Calculation
+
+Confidence Score is a weighted combination of eight pillar scores (Cash Flow, Resilience, Debt Health, Savings, Investing, Retirement, Financial Habits, Progress & Trajectory), each pillar itself derived from real evidence in the Accounts, Transactions, Budgets, Goals, and Net Worth domains — never a second, independent calculation of any of that evidence.
+
+### Invariants
+
+- Confidence calculations must derive from authoritative records, never fabricated or estimated.
+- Every point of the Confidence Score must be explainable (a reason code for every contributing and excluded pillar/signal).
+- A pillar or signal with no real evidence must be excluded from scoring, never defaulted to a fabricated neutral or punitive value.
+- Historical Confidence snapshots must not change when current values change.
+- The Confidence Score must never duplicate financial math owned by another domain.
+
+### Implementation: Confidence Engine V1
+
+Implemented in `src/db/schema/confidence-scores.ts`, `src/domains/confidence/`, `src/application/confidence/{confidence-calculations.ts,confidence-history-calculations.ts,confidence-snapshot-capture-service.ts}`, `src/infrastructure/db/confidence-repository.ts`, `src/composition/{confidence-composition.ts,confidence-query.ts}`, and `src/features/confidence/actions.ts`.
+
+**Scope gap resolved before implementation, not invented around.** `docs/products/confidence-engine.md` (Draft) is authoritative for the 8 pillars and their exact weights (Cash Flow 20%, Resilience 20%, Debt Health 15%, Savings 10%, Investing 10%, Retirement 10%, Financial Habits 10%, Progress & Trajectory 5%) and the 6 score bands (Exceptional 95-100 … At Risk 0-39) — none of these were changed. No document anywhere in this repository (`docs/financial-model/`, this file, or `docs/intelligence/*`) defines a sub-formula for turning a pillar's qualitative "Measures" into a 0-100 number, a missing-data policy, or a trend rule; this gap was reported to the user before any code was written, and the resolutions below reflect that conversation's explicit decisions, not a unilateral invention.
+
+**Missing-data policy (explicit user decision): exclude and renormalize.** A pillar or signal with no knowable evidence for a given owner is excluded entirely — never scored 0, never a fabricated neutral 50. The overall score is a weighted average of only the *available* pillars, with their spec weights renormalized to sum to 100% (`ConfidencePillarResult.effectiveWeight`). Every signal, available or not, still emits a reason code (`confidence-engine.md`: "Transparency over Mystery"). A distinct, related judgment call made after tests caught it: "no accounts of type X" is only ever a *real* negative signal (available, scored) once the owner has *some* account engagement at all (`activeAccounts.length > 0`); a genuinely brand-new owner with zero accounts of any kind gets an honest "unavailable" for Investing/Retirement/Financial Habits' budget-engagement signal instead of an instant 0 — treating "hasn't started yet" the same as "started and chose not to" would misrepresent a new user as already failing.
+
+**No duplicated financial math.** Every signal is built exclusively from canonical calculations this codebase already has: `computeNetWorthBreakdown`/`computeNetWorthHistory` (Net Worth), `BudgetService.getBudgetPeriodSummary` (Budgets), `GoalService.listGoalsWithProgress` (Goals), `computeSpendingSummary` (Transactions). `confidence-query.ts`'s `getConfidenceCalculationInputs` is the one place these are gathered; `computeConfidenceScore` (pure, no repository dependency) is the one place they are combined into pillar/overall scores.
+
+**Product-scope gaps are permanent, not per-owner.** Several named Measures have no backing domain at all in this codebase (insurance coverage, portfolio diversification, employer match, bills-paid-on-time, weekly reviews, Mission engagement/completion) — no Insurance, Investments-holdings, or Mission Engine domain exists. These are never estimated: each emits an always-unavailable `NOT_MEASURED_V1` signal (zero weight, purely informational), so what this version does not yet evaluate stays visible rather than silently omitted.
+
+**Persistence mirrors Net Worth History's architecture.** `confidence_score_snapshots` (immutable, insert-only, `SELECT`/`INSERT`-only RLS, unique on `(owner_id, snapshot_date)`) stores the *pillar scores* computed at capture time — never a full recomputation target. The current score is always computed live (`computeCurrentConfidenceScore`); trend/change attribution compares that live result against the single most recent real persisted snapshot (`selectComparisonSnapshot` + `computeConfidenceTrend`, the same "first snapshot establishes baseline" pattern as Net Worth). This satisfies "trend/history using real historical evidence only" without recomputing a fabricated historical score from old cross-domain data that, for Budgets/Goals, was never dated/snapshotted in the first place. No scheduler exists yet — the only capture path is a manual Server Action (`captureManualConfidenceSnapshot`) that takes no input and persists exactly what a live read would show, mirroring `captureManualNetWorthSnapshot` exactly.
+
+**Dashboard integration.** `getConfidenceOverview` (the same function the Dashboard page calls) replaces the former hardcoded mock (`confidenceScore`/`confidenceTrends` in `features/dashboard/mock-data.ts`, removed). `ConfidenceScoreCard` renders an honest "not enough data yet" state when `hasEvidence` is false, and an honest "first snapshot will establish your trend baseline" caption when `hasHistory` is false — never a fabricated score or trend.
+
+**Out of scope for V1** (per the implementation task's explicit instructions): AI coaching, the Mission Engine, the Financial Brief, Confidence Forecasting, and a Recommendations engine (ranking actions by estimated Confidence gain) — none of these are built. Reason codes satisfy the spec's "Why" and "What Helped/Declined" explainability questions; "What's Next" (a ranked recommendation) is not answered by this version.
 
 ---
 

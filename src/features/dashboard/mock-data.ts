@@ -1,13 +1,4 @@
-import type {
-  Account,
-  ActivityItem,
-  CashFlowPoint,
-  CategorySpend,
-  ConfidenceScore,
-  ConfidenceTrend,
-  MissionStatusItem,
-  StatSummary,
-} from "./types";
+import type { Account, ActivityItem, CashFlowPoint, CategorySpend, MissionStatusItem, StatSummary } from "./types";
 
 export const briefDate = {
   label: "May 29, 2026",
@@ -129,17 +120,6 @@ export const missionStatus: MissionStatusItem[] = [
     level: "needs-attention",
     detail: "82% this month",
   },
-];
-
-export const confidenceScore: ConfidenceScore = {
-  score: 92,
-  label: "Strong financial position",
-};
-
-export const confidenceTrends: ConfidenceTrend[] = [
-  { label: "This Month", value: 5 },
-  { label: "Last 3 Months", value: 14 },
-  { label: "Last Year", value: 37 },
 ];
 
 export const encouragementStatement = "You're making strong progress toward your financial goals.";
