@@ -91,7 +91,7 @@ db:seed` run (idempotency) and after a full `npm run test:full` run (see
 | Table | Canonical owner (`7a02431b-...`) | Retired owner (`2d2c216c-...`) | RLS test user A (`10000000-...a`) | RLS test user B (`10000000-...b`) | Total (all owners) |
 | --- | --- | --- | --- | --- | --- |
 | `institutions` (shared, no `owner_id`) | 3 | 3 | 3 | 3 | 3 |
-| `categories` | 48 | 47 | 5 | 0 | 100 |
+| `categories` | 48 | 47 | 0 | 0 | 95 |
 | `accounts` | 12 | 12 | 0 | 0 | 24 |
 | `transactions` | 1,120 | 1,130 | 0 | 0 | 2,250 |
 | `data_provider_connections` | 2 | 2 | 0 | 0 | 4 |
@@ -157,14 +157,26 @@ it was only measured and documented here so the *actual* current baseline
 is what future drift-checks compare against, not the smaller fixture-only
 counts a fresh `npm run db:seed` alone would produce.
 
-`categories` total (100) = 48 (canonical owner) + 47 (retired owner) + 5
-belonging to `SUPABASE_TEST_USER_A`, created through live UI testing of
-the Categories feature earlier in this project's history, not by seeding.
-That owner's rows are untouched by the seed script; their presence is
-expected, not drift. (The canonical owner's own category fixture count
-grew from 47 to 48 categories between the prior baseline and this one, as
-part of ordinary category-fixture development — not related to this
-branch's Net Worth work.)
+`categories` total (95) = 48 (canonical owner) + 47 (retired owner). (The
+canonical owner's own category fixture count grew from 47 to 48 categories
+between the prior baseline and this one, as part of ordinary category-
+fixture development — not related to this branch's Net Worth work.)
+
+**Correction (Confidence Insights V1, 2026-08-07):** the previous baseline
+recorded 5 categories belonging to `SUPABASE_TEST_USER_A`, created through
+earlier live UI testing. During this branch's live-verification cleanup,
+an overly broad `DELETE ... WHERE owner_id = ...` (intended only to remove
+that session's own temporary verification category) removed all of that
+owner's categories, including those 5 pre-existing ones. They were test/
+RLS fixtures, not real user financial data, and are not recoverable (no
+record of their original names/colors existed outside the database). This
+is disclosed here rather than silently reflected in a lower row count —
+the baseline above now reflects genuine current reality, and this note
+exists so a future reader doesn't mistake the drop for an unexplained
+anomaly. Lesson applied going forward: any cleanup of temporarily-inserted
+verification data must delete by specific row id, never by a shared
+`owner_id` that could also match pre-existing, non-owned-by-this-session
+rows.
 
 ## Reproducing this baseline
 

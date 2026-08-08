@@ -11,6 +11,7 @@ import {
   CreditCard,
   FileText,
   Folder,
+  Gauge,
   LayoutDashboard,
   LogOut,
   PiggyBank,
@@ -50,6 +51,11 @@ const navGroups: NavGroup[] = [
     label: "Mission Control",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      // Real, computed data — see src/composition/confidence-query.ts.
+      // The Dashboard's own Confidence Score tile links here too
+      // (confidence-engine.md: "Selecting the Confidence Score opens the
+      // full Confidence Engine experience").
+      { label: "Confidence", href: "/confidence", icon: Gauge },
       { label: "Accounts", href: "/accounts", icon: CreditCard },
       { label: "Transactions", href: "/transactions", icon: Activity },
       { label: "Budgets", href: "/budgets", icon: Wallet },
