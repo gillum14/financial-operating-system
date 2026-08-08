@@ -25,7 +25,7 @@ export function AppHeader() {
         />
         <input
           type="search"
-          placeholder="Search Athena"
+          placeholder="Search Mocal"
           className="w-64 rounded-[calc(var(--radius)-6px)] border border-[var(--border)] bg-[var(--background)] py-2 pr-3 pl-9 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:border-[var(--primary)] focus:outline-none"
         />
       </div>

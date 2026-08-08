@@ -105,15 +105,15 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function AthenaMark() {
+function MocalMark() {
   return (
     <Image
-      src="/images/logo/athena-icon.png"
+      src="/images/logo/mocal-icon.png"
       alt=""
-      width={32}
-      height={32}
+      width={48}
+      height={48}
       priority
-      className="h-8 w-8 shrink-0 object-contain"
+      className="h-12 w-12 shrink-0 object-contain"
     />
   );
 }
@@ -128,13 +128,13 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
       <div className="flex items-center gap-3 border-b border-[var(--border)] px-6 py-5">
-        <AthenaMark />
+        <MocalMark />
         <div>
           <p className="text-lg leading-tight font-semibold tracking-[0.08em] text-[var(--foreground)]">
-            ATHENA
+            MOCAL
           </p>
           <p className="text-[10px] leading-tight font-medium tracking-[0.12em] text-[var(--foreground-muted)] uppercase">
-            Financial Operating System
+            Your Financial Operating System
           </p>
         </div>
       </div>

@@ -13,9 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Athena", template: "%s | Athena" },
-  description:
-    "A secure financial operating system for managing financial data, workflows, reporting, and planning.",
+  title: { default: "Mocal", template: "%s | Mocal" },
+  description: "Your Financial Operating System",
 };
 
 export default function RootLayout({
