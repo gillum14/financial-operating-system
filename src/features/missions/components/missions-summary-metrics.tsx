@@ -1,31 +1,32 @@
 import { Flame, Gift, Star, Trophy } from "lucide-react";
 
+import type { MissionProgressionView } from "@/application/missions/missions-views";
 import StatCard, { StatCaption } from "@/components/ui/stat-card";
 
-// Matches the mockup's 4-tile layout and labels, but — same as the
-// pre-Mission-Engine placeholder version of this file — every value stays
-// an honest "—", never a fabricated number: there is no XP, leveling,
-// streak-tracking, or rewards system anywhere in this codebase (see
-// docs/adr/0006-mission-engine-v1-scope.md). Real mission counts
-// (available/active/completed) are shown elsewhere on this page instead,
-// where they're backed by real data.
-export function MissionsSummaryMetrics() {
+// Matches the mockup's 4-tile layout and labels — now backed by the real
+// Mission Progression System (MissionProgressionService via
+// missions-query.ts). Total Points is lifetime XP; Level and streak both
+// derive from real completions and their dates; Rewards Earned is the
+// real unlocked-achievement count. Nothing here is fabricated, and none
+// of it can influence the Confidence Score (see progression-service.ts's
+// module comment for why that separation is structural, not incidental).
+export function MissionsSummaryMetrics({ progression }: { progression: MissionProgressionView }) {
   return (
     <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Total Points" value="—" icon={Trophy}>
-        <StatCaption caption="Not tracked in this version" />
+      <StatCard label="Total Points" value={progression.totalXp.toLocaleString("en-US")} icon={Trophy}>
+        <StatCaption caption="Lifetime XP" />
       </StatCard>
 
-      <StatCard label="Level" value="—" icon={Star}>
-        <StatCaption caption="Not tracked in this version" />
+      <StatCard label="Level" value={String(progression.level)} icon={Star}>
+        <StatCaption caption={progression.xpIntoLevelLabel} />
       </StatCard>
 
-      <StatCard label="Current Streak" value="—" icon={Flame}>
-        <StatCaption caption="Not tracked in this version" />
+      <StatCard label="Current Streak" value={`${progression.currentStreak}d`} icon={Flame}>
+        <StatCaption caption={progression.longestStreak > 0 ? `Best: ${progression.longestStreak}d` : "Complete a mission to start one"} />
       </StatCard>
 
-      <StatCard label="Rewards Earned" value="—" icon={Gift}>
-        <StatCaption caption="Not tracked in this version" />
+      <StatCard label="Rewards Earned" value={String(progression.unlockedRewards.length)} icon={Gift}>
+        <StatCaption caption={progression.unlockedRewards.length > 0 ? progression.unlockedRewards[0].title : "None yet"} />
       </StatCard>
     </section>
   );

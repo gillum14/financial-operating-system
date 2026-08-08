@@ -1282,20 +1282,21 @@ Implemented in `src/application/confidence/confidence-presentation.ts`, `src/fea
 
 ## Missions
 
-The Missions domain turns real financial state into a small set of concrete, deterministic actions a user can start and complete. See `docs/products/mission-engine.md`, `docs/products/missions-specification.md`, and `docs/financial-model/missions-model.md` for the full aspirational product vision, and `docs/adr/0006-mission-engine-v1-scope.md` for the authoritative record of what Mission Engine V1 actually implements and why it deliberately implements less than those documents describe.
+The Missions domain turns real financial state into a small set of concrete, deterministic actions a user can start and complete. See `docs/products/mission-engine.md`, `docs/products/missions-specification.md`, and `docs/financial-model/missions-model.md` for the full aspirational product vision, `docs/adr/0006-mission-engine-v1-scope.md` for the original V1 scope decision, and `docs/adr/0007-mission-progression-system.md` for the real XP/level/streak/rewards layer added afterward.
 
 ### Primary Entity
 
 #### Mission
 
-A Mission represents one user-started, real-data-backed action. It includes:
+A Mission represents one user-started action — either real-data-backed (six deterministic types) or user-authored ("custom"). It includes:
 
 - Owner
-- Mission type (one of six: stay-within-budget, fund-emergency-fund, reach-savings-goal, categorize-transactions, reduce-debt, improve-confidence)
+- Mission type (stay-within-budget, fund-emergency-fund, reach-savings-goal, categorize-transactions, reduce-debt, improve-confidence, or custom)
 - Title and description (captured once, at start)
 - Status (active, completed, or archived)
-- A related Goal, Account, or Budget Period (exactly one, depending on mission type) or a snapshotted Transaction id set (categorize-transactions only)
+- A related Goal, Account, or Budget Period (exactly one, depending on mission type) or a snapshotted Transaction id set (categorize-transactions only) — none for custom
 - An immutable start-time snapshot (startValue/targetValue/targetBandId, where applicable)
+- Difficulty (easy/medium/hard/major-milestone, null for custom), locked XP value, and whether it was started from the Daily Mission spotlight — all captured once, at start, never edited (see Mission Progression System below)
 - Started timestamp, completed timestamp (set once, never cleared)
 
 There is no "Suggested" or "Available" row — see Lifecycle below.
@@ -1310,7 +1311,9 @@ Available is a live, computed eligibility result (`mission-eligibility.ts`'s `co
 - A mission is never created, completed, or archived for any owner other than the authenticated owner.
 - Mission completion must never write to, or otherwise influence, a Confidence Score calculation — the Confidence Engine remains the sole authority for confidence math.
 - A mission is never hard-deleted; archiving is the only removal path, and prior completion history is permanent.
-- No XP, level, streak, badge, or reward value exists anywhere in this domain.
+- XP is awarded exactly once per mission, enforced by a unique database index on `mission_xp_events.mission_id` — never solely by application-level "don't call this twice" discipline.
+- A reward is unlocked exactly once per (owner, reward), enforced by a unique database index — re-checking every reward's eligibility after every completion is always safe.
+- Mission Progression code (`MissionProgressionService`) has no dependency capable of reading financial data or a Confidence Score — the Confidence/Mission separation is structural, not a rule to remember.
 
 ### Implementation: Mission Engine V1
 
@@ -1323,6 +1326,16 @@ Implemented in `src/db/schema/missions.ts`, `src/domains/missions/`, `src/applic
 **Scope gap resolved before implementation, not invented around.** The commissioning task explicitly excluded gamification (XP/streaks/badges/leaderboards) and AI-generated missions, which conflicts directly with the full documented product vision. This was reported and resolved via four explicit decisions before any code was written — see `docs/adr/0006-mission-engine-v1-scope.md` for the full record, including the two genuine judgment calls it required (reduce-debt's payoff target, improve-confidence's next-band-up target) that no document defined.
 
 **Dashboard integration.** `getMissionsOverview` (the same function the `/missions` page calls) replaced the former hardcoded `missionStatus` mock in `features/dashboard/mock-data.ts` (removed).
+
+### Implementation: Mission Progression System
+
+Implemented in `src/db/schema/mission-progression.ts`, `src/domains/mission-progression/`, `src/application/missions/{progression-calculations.ts,progression-service.ts}`, and `src/infrastructure/db/mission-progression-repository.ts`. See `docs/adr/0007-mission-progression-system.md` for the full decision record, including why this reverses ADR-0006's original gamification exclusion.
+
+**Real XP, derived levels, a one-grace-day streak, and 8 deterministic rewards** — Easy/Medium/Hard/Major Milestone missions are worth 50/100/200/500 XP respectively (custom missions: a flat 100 XP cap), captured onto the mission row at creation so a later change to the point table can never retroactively change what an already-started mission is worth. Level is always `floor(totalXp / 1000) + 1`, computed on read, never stored. A completion's calendar date extends the current streak if the prior qualifying completion was 1 or 2 days earlier (the grace day), and resets to 1 otherwise.
+
+**Structurally separate from Confidence.** `MissionProgressionService`'s constructor takes only a `MissionProgressionRepository`, `MissionXpEventRepository`, and `MissionRewardRepository` — no `GoalService`, `BudgetService`, `AccountRepository`, `TransactionRepository`, or Confidence score getter. It is not possible for this class to read or influence a Confidence Score, because it has no path to reach one.
+
+**Exactly-once, enforced by the database, not by discipline.** `mission_xp_events.mission_id` and `mission_rewards.(owner_id, reward_key)` are both unique indexes; the repository layer uses `ON CONFLICT DO NOTHING` (never a plain insert wrapped in try/catch — a unique-constraint violation aborts the entire enclosing Postgres transaction, which catching the JS exception does not undo). `MissionService.recordMissionCompletion` is called from the same two places a mission ever transitions to Completed, and is safe to call more than once for the same mission regardless.
 
 ---
 
@@ -1959,3 +1972,4 @@ These decisions shall be resolved through architecture design, implementation re
 | 1.1.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Account CRUD backend (Slice 2): active/archived lifecycle, archive vs. soft-delete distinction, ownership guarantees, and the `src/features/accounts/actions.ts` Server Action surface. |
 | 1.2.0 | 2026-08-02 | Caitlin Gillum | Documented the implemented Category CRUD backend (Slice 3), following a domain audit: canonical schema (no migration), two-level hierarchy enforcement, soft-delete-only lifecycle with restore intentionally omitted, ownership guarantees, and deferred presentation metadata. Records a fix to a cross-owner soft-delete false-success bug found during implementation. |
 | 1.3.0 | 2026-08-08 | Caitlin Gillum | Documented the implemented Mission Engine V1 backend: the Missions domain (deterministic, non-gamified subset of the aspirational product docs — see ADR-0006), its lifecycle, invariants, and no-duplicated-math implementation. Corrects two now-stale Confidence-section statements that predated Mission Engine's existence. |
+| 1.4.0 | 2026-08-08 | Caitlin Gillum | Documented the Mission Progression System (real XP, derived levels, one-grace-day streaks, 8 deterministic rewards) that reverses ADR-0006's gamification exclusion per ADR-0007 — structurally separate from Confidence, exactly-once XP/reward guarantees enforced by unique database indexes. |

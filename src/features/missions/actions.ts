@@ -19,6 +19,7 @@ const startMissionInputSchema = z.object({
   relatedGoalId: z.string().uuid().optional(),
   relatedAccountId: z.string().uuid().optional(),
   relatedBudgetPeriodId: z.string().uuid().optional(),
+  isDailyMission: z.boolean().optional(),
 });
 
 const missionIdSchema = z.object({ missionId: z.string().uuid() });

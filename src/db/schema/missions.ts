@@ -1,4 +1,4 @@
-import { index, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { accounts } from "./accounts";
 import { budgetPeriods } from "./budgets";
@@ -37,6 +37,14 @@ export type MissionType = (typeof MISSION_TYPES)[number];
 // full rationale). No "paused"/"dismissed" either — out of scope for V1.
 export const MISSION_STATUSES = ["active", "completed", "archived"] as const;
 export type MissionStatus = (typeof MISSION_STATUSES)[number];
+
+// The Mission Progression System's difficulty tiers — see
+// progression-calculations.ts's MISSION_TYPE_DIFFICULTY for the fixed
+// mapping from each MissionType to one of these, and XP_BY_DIFFICULTY for
+// the point values. "custom" missions don't use this table; they're a
+// flat, separately-capped value (see that file).
+export const MISSION_DIFFICULTIES = ["easy", "medium", "hard", "major-milestone"] as const;
+export type MissionDifficulty = (typeof MISSION_DIFFICULTIES)[number];
 
 // Represents a user-started, deterministically-evaluated financial
 // mission. A mission never stores its own progress number — progress is
@@ -91,6 +99,21 @@ export const missions = pgTable(
     // once verified, a mission stays completed even if the underlying
     // financial state later reverses).
     completedAt: timestamp("completed_at", { withTimezone: true }),
+
+    // ---- Mission Progression System (locked at start, never edited) ----
+    // Every mission except "custom" gets a fixed difficulty from
+    // MISSION_TYPE_DIFFICULTY; custom missions store null here and are
+    // awarded a flat capped XP value instead (see progression-
+    // calculations.ts). xpValue is captured as a real number at the exact
+    // moment this row is created — not re-derived from difficulty at
+    // award time — so a future change to the XP-per-difficulty table can
+    // never retroactively change what an already-started mission is
+    // worth. isDailyMission records whether this mission was started from
+    // the Daily Mission spotlight, for the one-time +25 XP bonus at
+    // completion.
+    difficulty: text("difficulty").$type<MissionDifficulty>(),
+    xpValue: numeric("xp_value", { precision: 10, scale: 0, mode: "number" }).notNull(),
+    isDailyMission: boolean("is_daily_mission").notNull().default(false),
 
     ...timestamps,
   },

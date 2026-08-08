@@ -1,3 +1,4 @@
+import type { MissionRewardKey } from "@/domains/mission-progression/types";
 import type { MissionStatus, MissionType } from "@/domains/missions/types";
 
 // Presentation-shaped view model for the Missions workspace, kept outside
@@ -5,11 +6,12 @@ import type { MissionStatus, MissionType } from "@/domains/missions/types";
 // this *type* without pulling in a composition-root module — same pattern
 // as Transactions/Accounts/Budgets/Goals/Reports.
 //
-// Every field here is real: hasMissions/candidates/active/completed all
-// come from MissionService, which is itself backed entirely by the real
-// Goals/Budgets/Accounts/Transactions/Confidence domains. There is no XP,
-// level, streak, badge, or reward field anywhere in this model — Mission
-// Engine V1 deliberately does not compute any of those concepts.
+// hasMissions/candidates/active/completed come from MissionService, which
+// is itself backed entirely by the real Goals/Budgets/Accounts/
+// Transactions/Confidence domains. xpLabel/progression come from the
+// separate Mission Progression System (MissionProgressionService) —
+// XP/level/streak/rewards, structurally isolated from Confidence (see
+// progression-service.ts's module comment).
 export interface MissionRow {
   id: string;
   missionType: MissionType;
@@ -29,6 +31,10 @@ export interface MissionRow {
   // completeCustomMission). Every other mission type completes only
   // through real-data evaluation, never a manual click.
   canMarkComplete: boolean;
+  // e.g. "+200 XP" or "+125 XP" (base + the Daily Mission bonus) — the
+  // mission's own locked xpValue plus the +25 bonus if isDailyMission,
+  // formatted once here so every card renders it identically.
+  xpLabel: string;
 }
 
 export interface MissionCandidateRow {
@@ -38,11 +44,38 @@ export interface MissionCandidateRow {
   completionPercent: number;
   explanation: string;
   relatedPillarLabel: string | null;
+  xpLabel: string;
   // Exactly one of these is set — the exact id startMission needs to
   // re-identify this same candidate server-side.
   relatedGoalId?: string;
   relatedAccountId?: string;
   relatedBudgetPeriodId?: string;
+}
+
+export interface MissionRewardRow {
+  key: MissionRewardKey;
+  title: string;
+  description: string;
+  unlockedAtLabel: string;
+}
+
+// The Missions page's 4 real summary tiles — Total Points (totalXp),
+// Level, Current Streak, and Rewards Earned (unlockedRewards.length) all
+// read directly from here, replacing the honest "—" placeholders that
+// stood in for this exact shape before the Mission Progression System
+// existed.
+export interface MissionProgressionView {
+  totalXp: number;
+  level: number;
+  // e.g. "450 / 1,000 XP" — progress toward the next level.
+  xpIntoLevelLabel: string;
+  currentStreak: number;
+  longestStreak: number;
+  unlockedRewards: MissionRewardRow[];
+  // The remaining initial rewards not yet unlocked — title/description
+  // only (no unlock date, since there isn't one yet), for
+  // UpcomingRewardsCard's "still to earn" list.
+  lockedRewards: { key: MissionRewardKey; title: string; description: string }[];
 }
 
 // Aggregated entirely from the owner's own completed missions' own real,
@@ -66,4 +99,5 @@ export interface MissionsOverviewView {
   completed: MissionRow[];
   archived: MissionRow[];
   impactSummary: MissionImpactSummary;
+  progression: MissionProgressionView;
 }

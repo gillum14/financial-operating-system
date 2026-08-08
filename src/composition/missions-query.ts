@@ -2,17 +2,23 @@ import "server-only";
 
 import { MISSION_TYPE_PILLAR, type MissionProgress } from "@/application/missions/mission-calculations";
 import type { MissionCandidate } from "@/application/missions/mission-eligibility";
+import { DAILY_MISSION_BONUS_XP, computeMissionXpValue } from "@/application/missions/progression-calculations";
+import type { MissionProgressionOverview } from "@/application/missions/progression-service";
 import type { MissionWithProgress } from "@/application/missions/service";
 import type {
   MissionCandidateRow,
   MissionImpactSummary,
+  MissionProgressionView,
+  MissionRewardRow,
   MissionRow,
   MissionsOverviewView,
 } from "@/application/missions/missions-views";
 import { PILLAR_LABELS } from "@/application/confidence/confidence-calculations";
+import { REWARD_DEFINITIONS } from "@/application/missions/progression-calculations";
+import type { MissionRewardKey } from "@/domains/mission-progression/types";
 import type { Mission, MissionType } from "@/domains/missions/types";
 
-import { getMissionService } from "./missions-composition";
+import { getMissionProgressionService, getMissionService } from "./missions-composition";
 
 export type { MissionsOverviewView };
 
@@ -48,6 +54,11 @@ function formatDateTimeLabel(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function xpLabelFor(xpValue: number, isDailyMission: boolean): string {
+  const total = xpValue + (isDailyMission ? DAILY_MISSION_BONUS_XP : 0);
+  return `+${total.toLocaleString("en-US")} XP`;
+}
+
 function toMissionRow(mission: Mission, progress: MissionProgress): MissionRow {
   return {
     id: mission.id,
@@ -64,6 +75,7 @@ function toMissionRow(mission: Mission, progress: MissionProgress): MissionRow {
     startedAtLabel: formatDateTimeLabel(mission.startedAt),
     completedAtLabel: mission.completedAt ? formatDateTimeLabel(mission.completedAt) : null,
     canMarkComplete: mission.missionType === "custom" && mission.status === "active",
+    xpLabel: xpLabelFor(mission.xpValue, mission.isDailyMission),
   };
 }
 
@@ -103,6 +115,7 @@ function computeImpactSummary(missionsWithProgress: MissionWithProgress[]): Miss
 }
 
 function toCandidateRow(candidate: MissionCandidate): MissionCandidateRow {
+  const { xpValue } = computeMissionXpValue(candidate.missionType);
   return {
     missionType: candidate.missionType,
     title: candidate.title,
@@ -110,19 +123,63 @@ function toCandidateRow(candidate: MissionCandidate): MissionCandidateRow {
     completionPercent: Math.round(candidate.preview.percentComplete),
     explanation: candidate.preview.explanation,
     relatedPillarLabel: relatedPillarLabel(candidate.missionType),
+    xpLabel: xpLabelFor(xpValue, false),
     relatedGoalId: candidate.relatedGoalId,
     relatedAccountId: candidate.relatedAccountId,
     relatedBudgetPeriodId: candidate.relatedBudgetPeriodId,
   };
 }
 
+const REWARD_DEFINITION_BY_KEY = new Map(REWARD_DEFINITIONS.map((reward) => [reward.key, reward]));
+
+function toRewardRow(key: MissionRewardKey, unlockedAt: Date): MissionRewardRow {
+  const definition = REWARD_DEFINITION_BY_KEY.get(key);
+  return {
+    key,
+    title: definition?.title ?? key,
+    description: definition?.description ?? "",
+    unlockedAtLabel: formatDateTimeLabel(unlockedAt),
+  };
+}
+
+function toProgressionView(overview: MissionProgressionOverview): MissionProgressionView {
+  // Newest-unlocked-first — real unlock timestamps from the immutable
+  // mission_rewards ledger, never a fabricated "just now".
+  const sortedRewards = [...overview.unlockedRewards].sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime());
+  const unlockedKeys = new Set(overview.unlockedRewards.map((reward) => reward.key));
+  const lockedRewards = REWARD_DEFINITIONS.filter((definition) => !unlockedKeys.has(definition.key)).map((definition) => ({
+    key: definition.key,
+    title: definition.title,
+    description: definition.description,
+  }));
+
+  return {
+    totalXp: overview.totalXp,
+    level: overview.level,
+    xpIntoLevelLabel: `${overview.xpIntoLevel.toLocaleString("en-US")} / ${overview.xpForNextLevel.toLocaleString("en-US")} XP`,
+    currentStreak: overview.currentStreak,
+    longestStreak: overview.longestStreak,
+    unlockedRewards: sortedRewards.map((reward) => toRewardRow(reward.key, reward.unlockedAt)),
+    lockedRewards,
+  };
+}
+
 export async function getMissionsOverview(ownerId: string): Promise<MissionsOverviewView> {
   const missionService = getMissionService();
+  const progressionService = getMissionProgressionService();
 
+  // listMissionsWithProgress can have a real side effect — auto-completing
+  // a mission and, through that, calling MissionProgressionService.
+  // recordMissionCompletion (XP award, streak update, reward unlocks).
+  // getOverview must run strictly after it, never in parallel — otherwise
+  // a mission that completes for the first time in this exact request
+  // would read stale (pre-award) progression numbers. listCandidates has
+  // no such dependency and stays concurrent with the other two.
   const [candidates, missionsWithProgress] = await Promise.all([
     missionService.listCandidates(ownerId),
     missionService.listMissionsWithProgress(ownerId),
   ]);
+  const progressionOverview = await progressionService.getOverview(ownerId);
 
   const active: MissionRow[] = [];
   const completed: MissionRow[] = [];
@@ -145,5 +202,6 @@ export async function getMissionsOverview(ownerId: string): Promise<MissionsOver
     completed,
     archived,
     impactSummary: computeImpactSummary(missionsWithProgress),
+    progression: toProgressionView(progressionOverview),
   };
 }

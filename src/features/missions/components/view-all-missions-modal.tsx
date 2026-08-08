@@ -69,6 +69,7 @@ export function ViewAllMissionsModal({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-[var(--foreground)]">{candidate.title}</p>
                     {candidate.relatedPillarLabel && <Badge tone="primary">Supports: {candidate.relatedPillarLabel}</Badge>}
+                    <span className="text-xs font-medium text-[var(--primary)]">{candidate.xpLabel}</span>
                   </div>
                   <p className="mt-1 text-xs text-[var(--foreground-muted)]">{candidate.description}</p>
                   <p className="mt-1 text-xs text-[var(--foreground-muted)]">{candidate.explanation}</p>

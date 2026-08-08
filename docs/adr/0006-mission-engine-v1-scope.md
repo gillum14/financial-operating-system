@@ -6,7 +6,7 @@
 
 **Document Version:** 1.0.0
 
-**Status:** Accepted
+**Status:** Partially superseded by [ADR-0007](./0007-mission-progression-system.md) (see note below)
 
 **Date:** August 08, 2026
 
@@ -15,6 +15,19 @@
 **Primary Architect:** Caitlin Gillum
 
 **Technical Advisor:** Claude (Anthropic)
+
+---
+
+> **Superseded, in part (2026-08-08):** this ADR's exclusion of XP,
+> levels, streaks, and rewards was reversed later the same day by an
+> explicit, fully-specified request — see
+> [ADR-0007: Mission Progression System](./0007-mission-progression-system.md).
+> Everything else below (the 6 deterministic mission types, the 4-state
+> lifecycle, the eligibility engine, Confidence separation, no household/
+> custom-mission-library/AI-generated missions) remains accurate and in
+> effect. This document is kept as the historical record of why the
+> exclusion existed in the first place — read alongside ADR-0007, not in
+> place of it.
 
 ---
 
@@ -41,7 +54,7 @@ Mission Engine V1 implements a **non-gamified, deterministic mission-tracking co
 
 ## What V1 does not build
 
-- No XP, levels, streaks, badges, achievements, leaderboards, celebrations, or theme unlocks.
+- No XP, levels, streaks, badges, achievements, leaderboards, celebrations, or theme unlocks. **(XP, levels, streaks, and a fixed initial reward list were added later — see the superseding note above and ADR-0007. Badges/leaderboards/celebrations/theme-unlocks remain out of scope.)**
 - No rewards field of any kind (cosmetic, personal, or otherwise) — the commissioning task's own "each mission should expose" field list omits it entirely.
 - No mission recommendation/AI-suggestion engine — eligibility is pure, deterministic conditional logic (mirrors `deriveUpcomingObjectives` in `goal-calculations.ts`), not a scored or learned recommendation.
 - No household/shared missions, no custom user-created missions, no mission library, no `Suggested`, `Paused`, or `Dismissed` lifecycle states, no five-active-mission limit, no notifications.

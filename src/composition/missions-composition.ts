@@ -1,14 +1,33 @@
 import "server-only";
 
 import { MissionService } from "@/application/missions/service";
+import { MissionProgressionService } from "@/application/missions/progression-service";
 import { db } from "@/db/client";
 import { DrizzleAccountRepository } from "@/infrastructure/db/accounts-repository";
+import {
+  DrizzleMissionProgressionRepository,
+  DrizzleMissionRewardRepository,
+  DrizzleMissionXpEventRepository,
+} from "@/infrastructure/db/mission-progression-repository";
 import { DrizzleMissionRepository } from "@/infrastructure/db/missions-repository";
 import { DrizzleTransactionRepository } from "@/infrastructure/db/transactions-repository";
 
 import { getBudgetService } from "./budgets-composition";
 import { computeCurrentConfidenceScore } from "./confidence-query";
 import { getGoalService } from "./goals-composition";
+
+let missionProgressionService: MissionProgressionService | undefined;
+
+export function getMissionProgressionService(): MissionProgressionService {
+  if (!missionProgressionService) {
+    missionProgressionService = new MissionProgressionService(
+      new DrizzleMissionProgressionRepository(db),
+      new DrizzleMissionXpEventRepository(db),
+      new DrizzleMissionRewardRepository(db),
+    );
+  }
+  return missionProgressionService;
+}
 
 let missionService: MissionService | undefined;
 
@@ -31,6 +50,7 @@ export function getMissionService(): MissionService {
         const result = await computeCurrentConfidenceScore(ownerId);
         return result.overallScore;
       },
+      getMissionProgressionService(),
     );
   }
   return missionService;

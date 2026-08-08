@@ -10,3 +10,4 @@ export * from "./goals";
 export * from "./net-worth-snapshots";
 export * from "./confidence-scores";
 export * from "./missions";
+export * from "./mission-progression";

@@ -31,6 +31,7 @@ export function ActiveMissionsCard({ missions }: { missions: MissionRow[] }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-[var(--foreground)]">{mission.title}</p>
                     {mission.relatedPillarLabel && <Badge tone="primary">Supports: {mission.relatedPillarLabel}</Badge>}
+                    <span className="text-xs font-medium text-[var(--primary)]">{mission.xpLabel}</span>
                   </div>
                   <p className="mt-1 text-xs text-[var(--foreground-muted)]">{mission.description}</p>
                 </div>
