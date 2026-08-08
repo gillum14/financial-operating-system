@@ -29,6 +29,9 @@ import {
   goalAllocations,
   goalContributions,
   goals,
+  missionProgression,
+  missionRewards,
+  missionXpEvents,
   missions,
   transactions,
   type Account,
@@ -42,6 +45,9 @@ import {
   type GoalAllocation,
   type GoalContribution,
   type Mission,
+  type MissionProgression,
+  type MissionReward,
+  type MissionXpEvent,
   type NewAccount,
   type NewAccountBalanceSnapshot,
   type NewBudgetAllocation,
@@ -53,6 +59,9 @@ import {
   type NewGoalAllocation,
   type NewGoalContribution,
   type NewMission,
+  type NewMissionProgression,
+  type NewMissionReward,
+  type NewMissionXpEvent,
   type NewTransaction,
   type Transaction,
 } from "@/db/schema";
@@ -73,6 +82,9 @@ const QA_FIXTURE_TABLES = {
   confidence_score_snapshots: confidenceScoreSnapshots,
   account_balance_snapshots: accountBalanceSnapshots,
   missions,
+  mission_progression: missionProgression,
+  mission_xp_events: missionXpEvents,
+  mission_rewards: missionRewards,
 } as const;
 
 export type QaFixtureTableName = keyof typeof QA_FIXTURE_TABLES;
@@ -183,6 +195,24 @@ export class QaFixtureSet {
   async createMission(input: NewMission): Promise<Mission> {
     const [row] = await this.db.insert(missions).values(input).returning();
     this.record("missions", row.id);
+    return row;
+  }
+
+  async createMissionProgression(input: NewMissionProgression): Promise<MissionProgression> {
+    const [row] = await this.db.insert(missionProgression).values(input).returning();
+    this.record("mission_progression", row.id);
+    return row;
+  }
+
+  async createMissionXpEvent(input: NewMissionXpEvent): Promise<MissionXpEvent> {
+    const [row] = await this.db.insert(missionXpEvents).values(input).returning();
+    this.record("mission_xp_events", row.id);
+    return row;
+  }
+
+  async createMissionReward(input: NewMissionReward): Promise<MissionReward> {
+    const [row] = await this.db.insert(missionRewards).values(input).returning();
+    this.record("mission_rewards", row.id);
     return row;
   }
 

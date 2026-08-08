@@ -6,7 +6,10 @@ import type { MissionCandidateRow } from "@/application/missions/missions-views"
 import { startMission } from "@/features/missions/actions";
 import { useServerAction } from "@/lib/actions/use-action";
 
-export function StartMissionButton({ candidate }: { candidate: MissionCandidateRow }) {
+// isDailyMission defaults to false — only DailyMissionCard passes true,
+// locking in the one-time +25 XP bonus for a mission started from that
+// specific spotlight (see missions.is_daily_mission's schema comment).
+export function StartMissionButton({ candidate, isDailyMission = false }: { candidate: MissionCandidateRow; isDailyMission?: boolean }) {
   const router = useRouter();
   const start = useServerAction(startMission);
 
@@ -17,6 +20,7 @@ export function StartMissionButton({ candidate }: { candidate: MissionCandidateR
         relatedGoalId: candidate.relatedGoalId,
         relatedAccountId: candidate.relatedAccountId,
         relatedBudgetPeriodId: candidate.relatedBudgetPeriodId,
+        isDailyMission,
       },
       () => router.refresh(),
     );

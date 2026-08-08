@@ -31,6 +31,7 @@ export function CompletedMissionsCard({ missions }: { missions: MissionRow[] }) 
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="success">Completed</Badge>
                   <p className="text-sm font-medium text-[var(--foreground)]">{mission.title}</p>
+                  <span className="text-xs font-medium text-[var(--primary)]">{mission.xpLabel}</span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--foreground-muted)]">{mission.explanation}</p>
                 {mission.completedAtLabel && (

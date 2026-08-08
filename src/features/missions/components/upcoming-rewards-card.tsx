@@ -1,26 +1,48 @@
-import { Gift } from "lucide-react";
+import { CheckCircle2, Gift, Lock } from "lucide-react";
 
+import type { MissionProgressionView } from "@/application/missions/missions-views";
 import Card from "@/components/ui/card";
 import CardHeader from "@/components/ui/card-header";
 
-// Restored to the shell layout, but still functionally honest: Mission
-// Engine V1 has no reward system (no XP, no points, no unlockable
-// rewards — see docs/adr/0006-mission-engine-v1-scope.md). This card
-// never fabricates a reward name or value; it says plainly that rewards
-// aren't a supported concept yet, the same as the pre-Mission-Engine
-// placeholder did.
-export function UpcomingRewardsCard() {
+// The Mission Progression System's 8 real, deterministic rewards (see
+// progression-calculations.ts's REWARD_DEFINITIONS) — every unlocked one
+// shown here has a real unlock date from the immutable mission_rewards
+// ledger; every locked one shows only its title/description, never a
+// fabricated "X to go" progress count.
+export function UpcomingRewardsCard({ progression }: { progression: MissionProgressionView }) {
+  const hasAny = progression.unlockedRewards.length > 0 || progression.lockedRewards.length > 0;
+
   return (
     <Card>
       <CardHeader title="Upcoming Rewards" />
 
-      <div className="flex flex-col items-center justify-center rounded-[calc(var(--radius)-8px)] border border-dashed border-[var(--border)] px-6 py-8 text-center">
-        <Gift className="h-6 w-6 text-[var(--foreground-muted)]" strokeWidth={1.5} />
-        <p className="mt-3 text-sm font-medium text-[var(--foreground-secondary)]">Rewards aren&apos;t available yet</p>
-        <p className="mt-1 max-w-xs text-xs text-[var(--foreground-muted)]">
-          Mission Engine V1 focuses on real progress — a rewards system isn&apos;t built yet.
-        </p>
-      </div>
+      {!hasAny ? (
+        <div className="flex flex-col items-center justify-center rounded-[calc(var(--radius)-8px)] border border-dashed border-[var(--border)] px-6 py-8 text-center">
+          <Gift className="h-6 w-6 text-[var(--foreground-muted)]" strokeWidth={1.5} />
+          <p className="mt-3 text-sm font-medium text-[var(--foreground-secondary)]">No rewards yet</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {progression.unlockedRewards.map((reward) => (
+            <li key={reward.key} className="flex items-start gap-2.5 rounded-[calc(var(--radius)-8px)] border border-[var(--border)] p-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success)]" strokeWidth={1.75} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--foreground)]">{reward.title}</p>
+                <p className="text-xs text-[var(--foreground-muted)]">Unlocked {reward.unlockedAtLabel}</p>
+              </div>
+            </li>
+          ))}
+          {progression.lockedRewards.map((reward) => (
+            <li key={reward.key} className="flex items-start gap-2.5 rounded-[calc(var(--radius)-8px)] border border-dashed border-[var(--border)] p-3">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.75} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--foreground-secondary)]">{reward.title}</p>
+                <p className="text-xs text-[var(--foreground-muted)]">{reward.description}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

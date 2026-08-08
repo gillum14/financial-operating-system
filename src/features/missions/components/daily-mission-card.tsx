@@ -42,8 +42,12 @@ export function DailyMissionCard({ candidate }: { candidate: MissionCandidateRow
           </div>
           <p className="mt-2 text-xs text-[var(--foreground-muted)]">{candidate.explanation}</p>
 
-          <div className="mt-3">
-            <StartMissionButton candidate={candidate} />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <StartMissionButton candidate={candidate} isDailyMission />
+            {/* Starting THIS mission from here (not from Available
+                Missions) is what locks in the daily bonus — see
+                missions.is_daily_mission's schema comment. */}
+            <span className="text-xs font-medium text-[var(--primary)]">{candidate.xpLabel} + 25 daily bonus</span>
           </div>
         </div>
       )}

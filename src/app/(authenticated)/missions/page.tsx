@@ -41,7 +41,7 @@ export default async function MissionsPage() {
         <div className="min-w-0">
           <MissionsTabs>
             <div className="space-y-6">
-              <MissionsSummaryMetrics />
+              <MissionsSummaryMetrics progression={overview.progression} />
               <ActiveMissionsCard missions={overview.active} />
               <AvailableMissionsCard topCandidates={overview.topCandidates} allCandidates={overview.candidates} />
               <CompletedMissionsCard missions={overview.completed} />
@@ -52,14 +52,14 @@ export default async function MissionsPage() {
         <aside className="hidden space-y-4 min-[1360px]:block">
           <DailyMissionCard candidate={overview.topCandidates[0] ?? null} />
           <MissionImpactCard summary={overview.impactSummary} />
-          <UpcomingRewardsCard />
+          <UpcomingRewardsCard progression={overview.progression} />
         </aside>
       </div>
 
       <div className="space-y-4 min-[1360px]:hidden">
         <DailyMissionCard candidate={overview.topCandidates[0] ?? null} />
         <MissionImpactCard summary={overview.impactSummary} />
-        <UpcomingRewardsCard />
+        <UpcomingRewardsCard progression={overview.progression} />
       </div>
     </div>
   );

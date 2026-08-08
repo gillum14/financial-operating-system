@@ -23,6 +23,8 @@ import {
   type MissionProgress,
 } from "./mission-calculations";
 import { computeEligibleMissionCandidates, type MissionCandidate } from "./mission-eligibility";
+import { computeMissionXpValue } from "./progression-calculations";
+import type { MissionProgressionService } from "./progression-service";
 
 const startMissionSchema = z.object({
   ownerId: z.string().uuid(),
@@ -30,6 +32,12 @@ const startMissionSchema = z.object({
   relatedGoalId: z.string().uuid().optional(),
   relatedAccountId: z.string().uuid().optional(),
   relatedBudgetPeriodId: z.string().uuid().optional(),
+  // Whether this start was initiated from the Daily Mission spotlight —
+  // locked onto the row at creation (missions.is_daily_mission), the same
+  // as everything else start-time captures; determines the one-time +25
+  // XP bonus at completion (progression-calculations.ts's
+  // DAILY_MISSION_BONUS_XP).
+  isDailyMission: z.boolean().optional(),
 });
 
 const createCustomMissionSchema = z.object({
@@ -62,6 +70,12 @@ export class MissionService {
     private readonly accountRepository: AccountRepository,
     private readonly transactionRepository: TransactionRepository,
     private readonly getConfidenceScore: (ownerId: string) => Promise<number | null>,
+    // Injected the same way GoalService/BudgetService are — a plain
+    // sibling application-layer class, not a composition-layer import.
+    // Every completion transition below calls into this exactly once; see
+    // MissionProgressionService's own module comment for why it can never
+    // touch Confidence.
+    private readonly progressionService: MissionProgressionService,
   ) {}
 
   // ---- Eligibility (never persisted) ------------------------------------
@@ -104,6 +118,7 @@ export class MissionService {
     relatedGoalId?: string;
     relatedAccountId?: string;
     relatedBudgetPeriodId?: string;
+    isDailyMission?: boolean;
   }): Promise<Mission> {
     const parsed = startMissionSchema.safeParse(input);
     if (!parsed.success) {
@@ -116,11 +131,16 @@ export class MissionService {
       throw new ConflictError("This mission is no longer available to start.");
     }
 
+    const { difficulty, xpValue } = computeMissionXpValue(candidate.missionType);
+
     return this.missionRepository.create({
       ownerId: parsed.data.ownerId,
       missionType: candidate.missionType,
       title: candidate.title,
       description: candidate.description,
+      difficulty,
+      xpValue,
+      isDailyMission: parsed.data.isDailyMission ?? false,
       relatedGoalId: candidate.relatedGoalId ?? null,
       relatedAccountId: candidate.relatedAccountId ?? null,
       relatedBudgetPeriodId: candidate.relatedBudgetPeriodId ?? null,
@@ -143,11 +163,16 @@ export class MissionService {
       throw new ValidationError(parsed.error.message);
     }
 
+    const { difficulty, xpValue } = computeMissionXpValue("custom");
+
     return this.missionRepository.create({
       ownerId: parsed.data.ownerId,
       missionType: "custom",
       title: parsed.data.title,
       description: parsed.data.description,
+      difficulty,
+      xpValue,
+      isDailyMission: false,
       relatedGoalId: null,
       relatedAccountId: null,
       relatedBudgetPeriodId: null,
@@ -174,7 +199,9 @@ export class MissionService {
     if (mission.status !== "active") {
       throw new ConflictError(`Mission ${id} must be active to complete (current: ${mission.status})`);
     }
-    return this.missionRepository.updateStatus(id, ownerId, { status: "completed", completedAt: new Date() });
+    const completed = await this.missionRepository.updateStatus(id, ownerId, { status: "completed", completedAt: new Date() });
+    await this.progressionService.recordMissionCompletion(completed);
+    return completed;
   }
 
   // Active or Completed -> Archived. Never deletes the row — no DELETE
@@ -241,6 +268,7 @@ export class MissionService {
           status: "completed",
           completedAt: new Date(),
         });
+        await this.progressionService.recordMissionCompletion(current);
       }
 
       results.push({ mission: current, progress });

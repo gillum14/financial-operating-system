@@ -213,6 +213,8 @@ describe.skipIf(!hasDatabase)("QaFixtureSet (integration)", () => {
         missionType: "fund-emergency-fund",
         title: "Fund \"Emergency Fund\"",
         description: "Build your emergency fund toward its target.",
+        difficulty: "major-milestone",
+        xpValue: 500,
         relatedGoalId: goal.id,
       });
 
