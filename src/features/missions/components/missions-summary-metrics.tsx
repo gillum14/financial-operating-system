@@ -1,7 +1,9 @@
-import { Flame, Gift, Star, Trophy } from "lucide-react";
+import { Flame, Star, Trophy } from "lucide-react";
 
 import type { MissionProgressionView } from "@/application/missions/missions-views";
 import StatCard, { StatCaption } from "@/components/ui/stat-card";
+
+import { RewardsEarnedStatCard } from "./rewards-earned-stat-card";
 
 // Matches the mockup's 4-tile layout and labels — now backed by the real
 // Mission Progression System (MissionProgressionService via
@@ -25,9 +27,7 @@ export function MissionsSummaryMetrics({ progression }: { progression: MissionPr
         <StatCaption caption={progression.longestStreak > 0 ? `Best: ${progression.longestStreak}d` : "Complete a mission to start one"} />
       </StatCard>
 
-      <StatCard label="Rewards Earned" value={String(progression.unlockedRewards.length)} icon={Gift}>
-        <StatCaption caption={progression.unlockedRewards.length > 0 ? progression.unlockedRewards[0].title : "None yet"} />
-      </StatCard>
+      <RewardsEarnedStatCard progression={progression} />
     </section>
   );
 }

@@ -59,6 +59,19 @@ export interface MissionRewardRow {
   unlockedAtLabel: string;
 }
 
+export interface LockedMissionRewardRow {
+  key: MissionRewardKey;
+  title: string;
+  description: string;
+  // e.g. "3 of 5 missions completed" or "Level 2 of 5" — the same
+  // progression numbers already on MissionProgressionView, run through
+  // the reward's own canonical progress formula (see
+  // progression-calculations.ts's computeRewardProgress). Never
+  // recomputed independently in a component.
+  progressLabel: string;
+  progressPercent: number;
+}
+
 // The Missions page's 4 real summary tiles — Total Points (totalXp),
 // Level, Current Streak, and Rewards Earned (unlockedRewards.length) all
 // read directly from here, replacing the honest "—" placeholders that
@@ -72,10 +85,11 @@ export interface MissionProgressionView {
   currentStreak: number;
   longestStreak: number;
   unlockedRewards: MissionRewardRow[];
-  // The remaining initial rewards not yet unlocked — title/description
-  // only (no unlock date, since there isn't one yet), for
-  // UpcomingRewardsCard's "still to earn" list.
-  lockedRewards: { key: MissionRewardKey; title: string; description: string }[];
+  // The remaining initial rewards not yet unlocked, each carrying its own
+  // progress-toward-unlocking (no unlock date, since there isn't one
+  // yet) — used by both UpcomingRewardsCard's short list and the full
+  // Rewards tab grid.
+  lockedRewards: LockedMissionRewardRow[];
 }
 
 // Aggregated entirely from the owner's own completed missions' own real,

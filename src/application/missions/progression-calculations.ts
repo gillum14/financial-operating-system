@@ -131,30 +131,128 @@ export interface MissionRewardDefinition {
   key: MissionRewardKey;
   title: string;
   description: string;
-  isEligible: (stats: MissionRewardEligibilityStats) => boolean;
+  // The single numeric source both eligibility AND "progress toward
+  // unlocking" derive from — never two separate representations of the
+  // same threshold. targetValue is the value currentValue must reach;
+  // formatProgress renders the pair in whatever unit this reward is
+  // actually measured in (missions, streak days, levels, or a plain
+  // done/not-done milestone).
+  currentValue: (stats: MissionRewardEligibilityStats) => number;
+  targetValue: number;
+  formatProgress: (current: number, target: number) => string;
+}
+
+function isRewardEligible(definition: MissionRewardDefinition, stats: MissionRewardEligibilityStats): boolean {
+  return definition.currentValue(stats) >= definition.targetValue;
+}
+
+export interface RewardProgress {
+  current: number;
+  target: number;
+  percent: number;
+  label: string;
+  isComplete: boolean;
+}
+
+// The one place "how close is this locked reward" gets computed — used by
+// the query layer to render progress for still-locked rewards. Clamps
+// current to [0, target] so an already-eligible-but-not-yet-persisted
+// edge case (or a milestone's 0/1 value) never produces a >100% bar.
+export function computeRewardProgress(definition: MissionRewardDefinition, stats: MissionRewardEligibilityStats): RewardProgress {
+  const target = definition.targetValue;
+  const current = Math.min(Math.max(definition.currentValue(stats), 0), target);
+  return {
+    current,
+    target,
+    percent: target > 0 ? Math.round((current / target) * 100) : 100,
+    label: definition.formatProgress(current, target),
+    isComplete: current >= target,
+  };
+}
+
+function missionsProgressLabel(current: number, target: number): string {
+  return `${current} of ${target} missions completed`;
+}
+
+function streakProgressLabel(current: number, target: number): string {
+  return `${current}-day streak (goal: ${target} days)`;
+}
+
+function levelProgressLabel(current: number, target: number): string {
+  return `Level ${current} of ${target}`;
+}
+
+function milestoneProgressLabel(current: number, target: number): string {
+  return current >= target ? "Completed" : "Not yet completed";
 }
 
 // The 8 initial rewards, in the exact order given — each a deterministic
 // threshold check against real progression numbers, never a scored or
 // AI-suggested unlock.
 export const REWARD_DEFINITIONS: MissionRewardDefinition[] = [
-  { key: "first-step", title: "First Step", description: "Complete 1 mission.", isEligible: (s) => s.completedMissionCount >= 1 },
-  { key: "momentum", title: "Momentum", description: "Complete 5 missions.", isEligible: (s) => s.completedMissionCount >= 5 },
+  {
+    key: "first-step",
+    title: "First Step",
+    description: "Complete 1 mission.",
+    currentValue: (s) => s.completedMissionCount,
+    targetValue: 1,
+    formatProgress: missionsProgressLabel,
+  },
+  {
+    key: "momentum",
+    title: "Momentum",
+    description: "Complete 5 missions.",
+    currentValue: (s) => s.completedMissionCount,
+    targetValue: 5,
+    formatProgress: missionsProgressLabel,
+  },
   {
     key: "building-habits",
     title: "Building Habits",
     description: "Complete 10 missions.",
-    isEligible: (s) => s.completedMissionCount >= 10,
+    currentValue: (s) => s.completedMissionCount,
+    targetValue: 10,
+    formatProgress: missionsProgressLabel,
   },
-  { key: "on-a-roll", title: "On a Roll", description: "Reach a 7-day streak.", isEligible: (s) => s.currentStreak >= 7 },
-  { key: "consistency", title: "Consistency", description: "Reach a 30-day streak.", isEligible: (s) => s.currentStreak >= 30 },
-  { key: "level-up", title: "Level Up", description: "Reach Level 5.", isEligible: (s) => s.level >= 5 },
-  { key: "financial-builder", title: "Financial Builder", description: "Reach Level 10.", isEligible: (s) => s.level >= 10 },
+  {
+    key: "on-a-roll",
+    title: "On a Roll",
+    description: "Reach a 7-day streak.",
+    currentValue: (s) => s.currentStreak,
+    targetValue: 7,
+    formatProgress: streakProgressLabel,
+  },
+  {
+    key: "consistency",
+    title: "Consistency",
+    description: "Reach a 30-day streak.",
+    currentValue: (s) => s.currentStreak,
+    targetValue: 30,
+    formatProgress: streakProgressLabel,
+  },
+  {
+    key: "level-up",
+    title: "Level Up",
+    description: "Reach Level 5.",
+    currentValue: (s) => s.level,
+    targetValue: 5,
+    formatProgress: levelProgressLabel,
+  },
+  {
+    key: "financial-builder",
+    title: "Financial Builder",
+    description: "Reach Level 10.",
+    currentValue: (s) => s.level,
+    targetValue: 10,
+    formatProgress: levelProgressLabel,
+  },
   {
     key: "major-win",
     title: "Major Win",
     description: "Complete a Major Milestone mission.",
-    isEligible: (s) => s.hasCompletedMajorMilestone,
+    currentValue: (s) => (s.hasCompletedMajorMilestone ? 1 : 0),
+    targetValue: 1,
+    formatProgress: milestoneProgressLabel,
   },
 ];
 
@@ -167,5 +265,5 @@ export function computeNewlyEligibleRewards(
   stats: MissionRewardEligibilityStats,
   alreadyUnlockedKeys: ReadonlySet<MissionRewardKey>,
 ): MissionRewardDefinition[] {
-  return REWARD_DEFINITIONS.filter((reward) => !alreadyUnlockedKeys.has(reward.key) && reward.isEligible(stats));
+  return REWARD_DEFINITIONS.filter((reward) => !alreadyUnlockedKeys.has(reward.key) && isRewardEligible(reward, stats));
 }

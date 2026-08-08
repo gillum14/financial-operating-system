@@ -8,6 +8,7 @@ import {
   computeLevel,
   computeMissionXpValue,
   computeNewlyEligibleRewards,
+  computeRewardProgress,
   computeStreakUpdate,
   type MissionRewardEligibilityStats,
 } from "./progression-calculations";
@@ -176,5 +177,43 @@ describe("computeNewlyEligibleRewards", () => {
     const alreadyUnlocked = new Set<"first-step">(["first-step"]);
     const keys = computeNewlyEligibleRewards(stats({ completedMissionCount: 1 }), alreadyUnlocked).map((r) => r.key);
     expect(keys).not.toContain("first-step");
+  });
+
+  function definitionFor(key: string) {
+    const definition = REWARD_DEFINITIONS.find((r) => r.key === key);
+    if (!definition) throw new Error(`no reward definition for ${key}`);
+    return definition;
+  }
+
+  describe("computeRewardProgress", () => {
+    it("reports partial progress toward a missions-count reward, in its own units", () => {
+      const progress = computeRewardProgress(definitionFor("momentum"), stats({ completedMissionCount: 3 }));
+      expect(progress).toEqual({ current: 3, target: 5, percent: 60, label: "3 of 5 missions completed", isComplete: false });
+    });
+
+    it("reports partial progress toward a streak reward, in its own units", () => {
+      const progress = computeRewardProgress(definitionFor("on-a-roll"), stats({ currentStreak: 2 }));
+      expect(progress.label).toBe("2-day streak (goal: 7 days)");
+      expect(progress.percent).toBe(Math.round((2 / 7) * 100));
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it("reports partial progress toward a level reward, in its own units", () => {
+      const progress = computeRewardProgress(definitionFor("level-up"), stats({ level: 3 }));
+      expect(progress).toEqual({ current: 3, target: 5, percent: 60, label: "Level 3 of 5", isComplete: false });
+    });
+
+    it("reports the binary Major Win milestone as done/not-done, never a fractional percent", () => {
+      const notYet = computeRewardProgress(definitionFor("major-win"), stats({ hasCompletedMajorMilestone: false }));
+      expect(notYet).toEqual({ current: 0, target: 1, percent: 0, label: "Not yet completed", isComplete: false });
+
+      const done = computeRewardProgress(definitionFor("major-win"), stats({ hasCompletedMajorMilestone: true }));
+      expect(done).toEqual({ current: 1, target: 1, percent: 100, label: "Completed", isComplete: true });
+    });
+
+    it("clamps at 100% once the threshold is already met, never exceeding the target", () => {
+      const progress = computeRewardProgress(definitionFor("first-step"), stats({ completedMissionCount: 40 }));
+      expect(progress).toEqual({ current: 1, target: 1, percent: 100, label: "1 of 1 missions completed", isComplete: true });
+    });
   });
 });

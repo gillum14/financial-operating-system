@@ -8,11 +8,12 @@ type StatCardProps = {
   value: string;
   icon: LucideIcon;
   children?: ReactNode;
+  onClick?: () => void;
 };
 
-export default function StatCard({ label, value, icon: Icon, children }: StatCardProps) {
+export default function StatCard({ label, value, icon: Icon, children, onClick }: StatCardProps) {
   return (
-    <Card>
+    <Card onClick={onClick}>
       <div className="flex items-start justify-between gap-2">
         {/* min-w-0 lets this flex item shrink below its unwrapped text
             width — without it, a longer label in a narrower card (e.g.

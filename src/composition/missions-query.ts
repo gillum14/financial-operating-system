@@ -6,6 +6,7 @@ import { DAILY_MISSION_BONUS_XP, computeMissionXpValue } from "@/application/mis
 import type { MissionProgressionOverview } from "@/application/missions/progression-service";
 import type { MissionWithProgress } from "@/application/missions/service";
 import type {
+  LockedMissionRewardRow,
   MissionCandidateRow,
   MissionImpactSummary,
   MissionProgressionView,
@@ -14,7 +15,7 @@ import type {
   MissionsOverviewView,
 } from "@/application/missions/missions-views";
 import { PILLAR_LABELS } from "@/application/confidence/confidence-calculations";
-import { REWARD_DEFINITIONS } from "@/application/missions/progression-calculations";
+import { computeRewardProgress, REWARD_DEFINITIONS } from "@/application/missions/progression-calculations";
 import type { MissionRewardKey } from "@/domains/mission-progression/types";
 import type { Mission, MissionType } from "@/domains/missions/types";
 
@@ -147,11 +148,32 @@ function toProgressionView(overview: MissionProgressionOverview): MissionProgres
   // mission_rewards ledger, never a fabricated "just now".
   const sortedRewards = [...overview.unlockedRewards].sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime());
   const unlockedKeys = new Set(overview.unlockedRewards.map((reward) => reward.key));
-  const lockedRewards = REWARD_DEFINITIONS.filter((definition) => !unlockedKeys.has(definition.key)).map((definition) => ({
-    key: definition.key,
-    title: definition.title,
-    description: definition.description,
-  }));
+
+  // hasCompletedMajorMilestone is always false here: it is never a
+  // persisted running stat (only knowable at completion-time, see
+  // MissionProgressionService.unlockEligibleRewards), and a still-LOCKED
+  // reward could never have seen it be true — if it had, "major-win"
+  // would already be unlocked and wouldn't reach this branch. False is
+  // therefore correct by invariant for every reward computed below, not
+  // a placeholder.
+  const eligibilityStats = {
+    completedMissionCount: overview.completedMissionCount,
+    currentStreak: overview.currentStreak,
+    level: overview.level,
+    hasCompletedMajorMilestone: false,
+  };
+  const lockedRewards: LockedMissionRewardRow[] = REWARD_DEFINITIONS.filter(
+    (definition) => !unlockedKeys.has(definition.key),
+  ).map((definition) => {
+    const progress = computeRewardProgress(definition, eligibilityStats);
+    return {
+      key: definition.key,
+      title: definition.title,
+      description: definition.description,
+      progressLabel: progress.label,
+      progressPercent: progress.percent,
+    };
+  });
 
   return {
     totalXp: overview.totalXp,
