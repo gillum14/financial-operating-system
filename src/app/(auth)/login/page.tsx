@@ -16,7 +16,7 @@ export default async function LoginPage({
   return (
     <AuthCard
       title="Sign in"
-      subtitle="Welcome back to Athena."
+      subtitle="Welcome back to Mocal."
       footer={
         <>
           <Link href="/forgot-password" className="text-[var(--primary)] hover:underline">

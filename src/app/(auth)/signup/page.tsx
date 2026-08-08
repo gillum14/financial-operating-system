@@ -7,7 +7,7 @@ export default function SignupPage() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Start tracking your finances with Athena."
+      subtitle="Start tracking your finances with Mocal."
       footer={
         <>
           Already have an account?{" "}

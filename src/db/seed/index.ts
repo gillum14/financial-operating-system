@@ -39,7 +39,7 @@ To initialize the development database:
 1. Run:
    npm run dev
 
-2. Create an account through Athena.
+2. Create an account through Mocal.
 
 3. Copy that user's UUID from Supabase.
 

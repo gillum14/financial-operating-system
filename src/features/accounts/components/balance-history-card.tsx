@@ -29,7 +29,7 @@ export function BalanceHistoryCard() {
         <LineChart className="h-6 w-6 text-[var(--foreground-muted)]" strokeWidth={1.5} />
         <p className="mt-3 text-sm font-medium text-[var(--foreground-secondary)]">Balance history isn&apos;t tracked yet</p>
         <p className="mt-1 max-w-xs text-xs text-[var(--foreground-muted)]">
-          Athena currently stores only the current balance for each account, not a history of past values.
+          Mocal currently stores only the current balance for each account, not a history of past values.
         </p>
       </div>
     </Card>
