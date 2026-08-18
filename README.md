@@ -105,7 +105,7 @@ Selected controls and engineering practices include:
 
 Detailed threat models, security implementation details, infrastructure configuration, incident documentation, credentials, and operational procedures are intentionally excluded from this public repository.
 
-For a public overview of the project's security engineering methodology, see [`SECURITY.md`](SECURITY.md).
+For a public overview of the project's security engineering methodology, see [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ---
 
