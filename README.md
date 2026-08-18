@@ -44,28 +44,6 @@ The application is being built from architecture through implementation as an in
 
 ---
 
-## Screenshots
-
-> Selected application screenshots will be added here as development milestones are finalized.
-
-### Dashboard
-
-<!-- Dashboard screenshot -->
-
-### Transactions
-
-<!-- Transactions screenshot -->
-
-### Goals
-
-<!-- Goals screenshot -->
-
-### Financial Missions
-
-<!-- Missions screenshot -->
-
----
-
 ## Technology
 
 ### Application
@@ -127,6 +105,8 @@ Selected controls and engineering practices include:
 
 Detailed threat models, security implementation details, infrastructure configuration, incident documentation, credentials, and operational procedures are intentionally excluded from this public repository.
 
+For a public overview of the project's security engineering methodology, see [`SECURITY.md`](SECURITY.md).
+
 ---
 
 ## Architecture
@@ -150,7 +130,7 @@ The private engineering documentation includes dedicated architecture specificat
 - Engineering principles
 - Architecture Decision Records
 
-A sanitized high-level architecture overview will be maintained in this repository.
+A sanitized high-level architecture overview is available in [`docs/architecture-overview.md`](docs/architecture-overview.md).
 
 ---
 
@@ -217,6 +197,44 @@ Manual browser verification
 ```
 
 The project has progressed through more than **100 pull requests**, covering architecture, infrastructure, security, financial-domain logic, application features, testing, and UI development.
+
+---
+
+## Product Showcase
+
+The following screenshots demonstrate selected interfaces from the working application. They are included to showcase the project's frontend implementation, financial-domain modeling, data visualization, and mission-based financial engagement system.
+
+> **Portfolio Note:** All financial information shown below—including account names, institutions, balances, transactions, account identifiers, goals, and financial history—is synthetic demo data created for development and testing. No real customer or personal financial data is displayed.
+
+### Financial Dashboard
+
+A centralized financial command center combining net worth, cash flow, budget performance, investments, goals, account activity, and operational financial insights.
+
+![Financial dashboard](assets/screenshots/dashboard.png)
+
+### Transaction Management
+
+Transaction review and categorization with account, category, type, and date filtering alongside contextual spending analysis.
+
+![Transaction management](assets/screenshots/transactions.png)
+
+### Goal Management
+
+Goal tracking with linked funding sources, fund allocation, progress measurement, milestones, and contribution management.
+
+![Financial goal management](assets/screenshots/goals.png)
+
+### Mission System
+
+A mission-based engagement system that converts financial behaviors and measurable progress into actionable objectives, XP, streaks, achievements, and rewards.
+
+![Financial mission system](assets/screenshots/missions.png)
+
+### Net Worth Analytics
+
+Asset and liability modeling with historical net-worth tracking, category breakdowns, change analysis, and long-term goal progression.
+
+![Net worth analytics](assets/screenshots/net-worth.png)
 
 ---
 
